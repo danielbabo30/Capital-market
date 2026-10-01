@@ -7,3 +7,20 @@ input { text-align: center; letter-spacing: 6px; }
 button { cursor: pointer; }
 button:disabled { opacity: 0.5; cursor: default; }
 .error { color: #d33; margin: 0; }
+.app { max-width: 640px; margin: 0 auto; padding: 12px; }
+header { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+nav, .actions { display: flex; gap: 6px; }
+nav button.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+header button { font-size: 0.95rem; padding: 6px 12px; }
+.card { border: 1px solid #8884; border-radius: 12px; padding: 12px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 6px; }
+.row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.big { font-size: 1.4rem; font-weight: 600; }
+.muted { opacity: 0.65; font-size: 0.9rem; }
+.pos { color: #16a34a; }
+.neg { color: #dc2626; }
+.links { font-size: 0.9rem; padding-top: 4px; }
+button.link { border: none; background: none; color: #2563eb; padding: 0; font-size: 0.9rem; }
+.add label { display: flex; flex-direction: column; gap: 4px; font-size: 0.95rem; }
+.add input, .add select { text-align: right; letter-spacing: 0; }
+.add input[dir="ltr"] { text-align: left; }
+details summary { cursor: pointer; font-size: 0.9rem; }

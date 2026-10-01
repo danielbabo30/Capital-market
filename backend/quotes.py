@@ -5,6 +5,7 @@ converted to shekels here, once, so every other field is already in ILS.
 """
 from datetime import timezone
 
+import pandas as pd
 import yfinance as yf
 
 DEFAULT_SYMBOLS = ["TEVA.TA", "AAPL", "ILS=X"]
@@ -21,7 +22,7 @@ def fetch_quotes(symbols):
     out = {}
     for sym in symbols:
         try:
-            df = data[sym] if len(symbols) > 1 else data
+            df = data[sym] if isinstance(data.columns, pd.MultiIndex) else data
             df = df.dropna(subset=["Close"])
             if df.empty:
                 raise ValueError("no data")
@@ -41,3 +42,34 @@ def fetch_quotes(symbols):
         except Exception as e:  # one bad symbol must not sink the rest
             out[sym] = {"error": str(e)}
     return out
+
+
+EXCHANGES = {"NMS": "NASDAQ", "NGM": "NASDAQ", "NCM": "NASDAQ", "NYQ": "NYSE", "PCX": "NYSEARCA", "ASE": "NYSEAMERICAN", "TLV": "TLV"}
+
+
+def describe(symbol):
+    """Name and Google-Finance exchange code for a symbol (used once, when a stock is added)."""
+    try:
+        info = yf.Ticker(symbol).info or {}
+    except Exception:
+        info = {}
+    default = "TLV" if symbol.endswith(".TA") else None
+    return {
+        "name": info.get("shortName") or info.get("longName") or symbol,
+        "exchange": EXCHANGES.get(info.get("exchange"), default),
+    }
+
+
+def fx_on(date):
+    """USD->ILS close on the given ISO date (or the first trading day after it)."""
+    from datetime import date as _d, timedelta
+    d = _d.fromisoformat(date)
+    df = yf.download("ILS=X", start=d.isoformat(), end=(d + timedelta(days=7)).isoformat(),
+                     interval="1d", progress=False, auto_adjust=False)
+    close = df["Close"]
+    if isinstance(close, pd.DataFrame):
+        close = close.iloc[:, 0]
+    close = close.dropna()
+    if close.empty:
+        raise ValueError("no fx rate for date")
+    return round(float(close.iloc[0]), 4)

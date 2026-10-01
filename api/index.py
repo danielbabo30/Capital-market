@@ -4,10 +4,11 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response  # noqa: E402
+from typing import Optional  # noqa: E402
+
 from pydantic import BaseModel  # noqa: E402
 
-from backend import auth, db  # noqa: E402
-from backend.quotes import fetch_quotes  # noqa: E402
+from backend import auth, db, service  # noqa: E402
 
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 
@@ -48,26 +49,52 @@ def me():
     return {"ok": True}
 
 
-@app.get("/api/quotes", dependencies=[Depends(require_session)])
-def quotes(symbols: str = "TEVA.TA,AAPL,ILS=X"):
-    syms = [s.strip() for s in symbols.split(",") if s.strip()][:50]
-    return fetch_quotes(syms)
-
-
 @app.post("/api/init-db", dependencies=[Depends(require_session)])
 def init_db():
     db.init_schema()
     return {"ok": True}
 
 
-@app.get("/api/health")
-def health():
-    """Reports which env vars exist (never their values) and whether Turso answers."""
-    names = ["APP_PIN", "SESSION_SECRET", "TURSO_DATABASE_URL", "TURSO_AUTH_TOKEN"]
-    out = {"env": {n: bool(os.environ.get(n)) for n in names}}
+
+class AddStock(BaseModel):
+    symbol: str
+    list: str
+    date: Optional[str] = None
+    price: Optional[float] = None
+    quantity: Optional[float] = None
+    fx_rate: Optional[float] = None
+
+
+def _guard(fn, *a, **kw):
     try:
-        db.query("SELECT 1")
-        out["db"] = "ok"
-    except Exception as e:
-        out["db"] = type(e).__name__
-    return out
+        return fn(*a, **kw)
+    except LookupError as e:
+        raise HTTPException(404, str(e))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/refresh", dependencies=[Depends(require_session)])
+def refresh():
+    return service.refresh()
+
+
+@app.get("/api/portfolio", dependencies=[Depends(require_session)])
+def portfolio():
+    return service.portfolio()
+
+
+@app.post("/api/stocks", dependencies=[Depends(require_session)])
+def add_stock(body: AddStock):
+    return _guard(service.add_stock, body.symbol, body.list, body.date, body.price, body.quantity, body.fx_rate)
+
+
+@app.delete("/api/stocks/{symbol}", dependencies=[Depends(require_session)])
+def delete_stock(symbol: str):
+    service.delete_stock(symbol.upper())
+    return {"ok": True}
+
+
+@app.delete("/api/transactions/{tx_id}", dependencies=[Depends(require_session)])
+def delete_transaction(tx_id: int):
+    return _guard(service.delete_transaction, tx_id) or {"ok": True}

@@ -1,0 +1,171 @@
+import re
+from datetime import date as date_cls, datetime, timezone
+
+from . import calc, db, markets
+from . import quotes as yq
+
+SYMBOL_RE = re.compile(r"^[A-Z0-9.\-=^]{1,15}$")
+
+
+def _now():
+    return datetime.now(timezone.utc)
+
+
+def _dt(s):
+    return datetime.fromisoformat(s) if s else None
+
+
+def refresh(now=None):
+    """Pull from Yahoo only the symbols that need it, in one bulk call, and cache the result.
+    A failed pull never deletes old data; it only flags the symbol as not updated."""
+    now = now or _now()
+    db.init_schema()
+    symbols = {r[0] for r in db.query("SELECT symbol FROM stocks")}
+    if db.query("SELECT 1 FROM stocks WHERE currency = 'USD' LIMIT 1"):
+        symbols.add("ILS=X")
+    fetched = {r[0]: _dt(r[1]) for r in db.query("SELECT symbol, fetched_at FROM quotes")}
+    due = sorted(s for s in symbols if markets.needs_refresh(markets.market_of(s), fetched.get(s), now))
+    if not due:
+        return {"pulled": [], "failed": []}
+    try:
+        data = yq.fetch_quotes(due)
+    except Exception:
+        data = {s: {"error": "fetch failed"} for s in due}
+    stmts, pulled, failed = [], [], []
+    for sym in due:
+        q = data.get(sym, {"error": "missing"})
+        if "error" in q:
+            failed.append(sym)
+            stmts.append(("INSERT OR REPLACE INTO quote_status (symbol, failed) VALUES (?, 1)", [sym]))
+        else:
+            pulled.append(sym)
+            stmts.append(("INSERT OR REPLACE INTO quotes (symbol, price, day_open, quote_time, fetched_at) "
+                          "VALUES (?, ?, ?, ?, ?)", [sym, q["price"], q["day_open"], q["quote_time_utc"], now.isoformat()]))
+            stmts.append(("INSERT OR REPLACE INTO quote_status (symbol, failed) VALUES (?, 0)", [sym]))
+    db.run(stmts)
+    return {"pulled": pulled, "failed": failed}
+
+
+def add_stock(symbol, lst, date=None, price=None, quantity=None, fx_rate=None, now=None):
+    now = now or _now()
+    symbol = (symbol or "").strip().upper()
+    if not SYMBOL_RE.match(symbol):
+        raise ValueError("סימול לא תקין")
+    if lst not in ("buy", "watch"):
+        raise ValueError("רשימה לא תקינה")
+    rows = db.query("SELECT currency FROM stocks WHERE symbol = ?", [symbol])
+    if lst == "watch" and rows:
+        raise ValueError("המניה כבר קיימת")
+    if lst == "buy":
+        try:
+            if date_cls.fromisoformat(date) > now.date():
+                raise ValueError("תאריך עתידי")
+        except (TypeError, ValueError):
+            raise ValueError("תאריך לא תקין")
+        if not (quantity and quantity > 0 and price and price > 0):
+            raise ValueError("כמות ושער חייבים להיות חיוביים")
+    if rows:
+        currency = rows[0][0]
+    else:
+        q = yq.fetch_quotes([symbol])[symbol]
+        if "error" in q:
+            raise LookupError("הסימול לא נמצא ב-Yahoo")
+        currency = q["currency"]
+        if currency not in ("ILS", "USD"):
+            raise ValueError(f"מטבע לא נתמך: {currency}")
+        d = yq.describe(symbol)
+        db.run([
+            ("INSERT INTO stocks (symbol, name, list, currency, exchange, added_at) VALUES (?, ?, 'watch', ?, ?, ?)",
+             [symbol, d["name"], currency, d["exchange"], now.isoformat()]),
+            ("INSERT OR REPLACE INTO quotes (symbol, price, day_open, quote_time, fetched_at) VALUES (?, ?, ?, ?, ?)",
+             [symbol, q["price"], q["day_open"], q["quote_time_utc"], now.isoformat()]),
+        ])
+    if lst == "buy":
+        fx = None
+        if currency == "USD":
+            fx = fx_rate or yq.fx_on(date)  # empty -> by purchase date
+        db.run([
+            ("INSERT INTO transactions (symbol, type, date, quantity, price, fx_rate) VALUES (?, 'buy', ?, ?, ?, ?)",
+             [symbol, date, quantity, price, fx]),
+            ("UPDATE stocks SET list = 'buy' WHERE symbol = ?", [symbol]),
+        ])
+    return {"symbol": symbol}
+
+
+def delete_stock(symbol):
+    db.run([(f"DELETE FROM {t} WHERE symbol = ?", [symbol])
+            for t in ("transactions", "quotes", "quote_status", "daily_bars", "stocks")])
+
+
+def delete_transaction(tx_id):
+    rows = db.query("SELECT symbol FROM transactions WHERE id = ?", [tx_id])
+    if not rows:
+        raise LookupError("not found")
+    sym = rows[0][0]
+    db.query("DELETE FROM transactions WHERE id = ?", [tx_id])
+    if not db.query("SELECT 1 FROM transactions WHERE symbol = ? AND type = 'buy' LIMIT 1", [sym]):
+        db.query("UPDATE stocks SET list = 'watch' WHERE symbol = ?", [sym])
+
+
+def _money(x):
+    return None if x is None else round(x, 2)
+
+
+def _pct(x):
+    return None if x is None else round(x * 100, 2)
+
+
+def portfolio():
+    stocks = db.query("SELECT symbol, name, list, currency, exchange FROM stocks ORDER BY added_at")
+    txs = db.query("SELECT id, symbol, type, date, quantity, price, gross, fees, tax, fx_rate "
+                   "FROM transactions ORDER BY date, id")
+    quotes = {r[0]: r for r in db.query("SELECT symbol, price, day_open, quote_time, fetched_at FROM quotes")}
+    failed = {r[0] for r in db.query("SELECT symbol FROM quote_status WHERE failed = 1")}
+    fx_now = quotes["ILS=X"][1] if "ILS=X" in quotes else None
+
+    buys, sold, tx_list = {}, {}, {}
+    for id_, sym, typ, date, qty, price, _g, _f, _t, fx in txs:
+        if typ == "buy":
+            buys.setdefault(sym, []).append({"quantity": qty, "price": price, "fx_rate": fx})
+            tx_list.setdefault(sym, []).append({"id": id_, "date": date, "quantity": qty, "price": price, "fx_rate": fx})
+        else:
+            sold[sym] = sold.get(sym, 0) + qty
+
+    buy_rows, watch_rows, positions, as_of = [], [], [], {}
+    for sym, name, lst, currency, exch in stocks:
+        q = quotes.get(sym)
+        price = q[1] if q else None
+        label = qt = None
+        if q:
+            qt, ft = _dt(q[3]), _dt(q[4])
+            label = markets.as_of_label(qt, ft)
+            m = markets.market_of(sym)
+            if m not in as_of or qt > as_of[m][0]:
+                as_of[m] = (qt, label)
+        row = {
+            "symbol": sym, "name": name, "currency": currency, "price": price,
+            "as_of": label, "stale": sym in failed or q is None,
+            "google_url": f"https://www.google.com/finance/quote/{sym.split('.')[0]}:{exch}" if exch else None,
+            "yahoo_url": f"https://finance.yahoo.com/quote/{sym}",
+        }
+        if lst == "watch":
+            watch_rows.append(row)
+            continue
+        pos = calc.position(buys.get(sym, []), sold.get(sym, 0), price, fx_now, currency)
+        positions.append(pos)
+        row.update(
+            qty=pos["qty"], avg_price=None if pos["avg_price"] is None else round(pos["avg_price"], 4),
+            value_ils=_money(pos.get("value")), cost_ils=_money(pos.get("cost")),
+            pl_ils=_money(pos.get("pl")), pl_pct=_pct(pos.get("pct")),
+            stock_pl_ils=_money(pos.get("stock_pl")), fx_pl_ils=_money(pos.get("fx_pl")),
+            transactions=tx_list.get(sym, []),
+        )
+        buy_rows.append(row)
+
+    s = calc.summarize(positions)
+    return {
+        "summary": {"value_ils": _money(s["value"]), "cost_ils": _money(s["cost"]),
+                    "pl_ils": _money(s["pl"]), "pl_pct": _pct(s["pct"])},
+        "as_of": {m: v[1] for m, v in as_of.items()},
+        "buy": buy_rows, "watch": watch_rows,
+    }
