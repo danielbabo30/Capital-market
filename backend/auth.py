@@ -35,7 +35,11 @@ def attempt_login(pin, now=None):
     """Returns ('ok'|'bad'|'locked', seconds_locked). Failure state is kept in the DB
     because serverless instances share no memory."""
     now = int(now or time.time())
-    fails, locked_until = db.query("SELECT fails, locked_until FROM login_state WHERE id = 1")[0]
+    try:
+        fails, locked_until = db.query("SELECT fails, locked_until FROM login_state WHERE id = 1")[0]
+    except (RuntimeError, IndexError):  # first run: schema not created yet
+        db.init_schema()
+        fails, locked_until = db.query("SELECT fails, locked_until FROM login_state WHERE id = 1")[0]
     if locked_until > now:
         return "locked", locked_until - now
     if hmac.compare_digest(pin.encode(), os.environ["APP_PIN"].encode()):
