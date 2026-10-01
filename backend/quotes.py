@@ -1,13 +1,9 @@
-"""Step 1: verify yfinance works from a Vercel function.
+"""Bulk quote fetch via yfinance.
 
-GET /api/quotes?symbols=TEVA.TA,AAPL,ILS=X  (default: those three)
 One bulk request for all symbols. TASE prices arrive in agorot (ILA) and are
 converted to shekels here, once, so every other field is already in ILS.
 """
-import json
 from datetime import timezone
-from http.server import BaseHTTPRequestHandler
-from urllib.parse import urlparse, parse_qs
 
 import yfinance as yf
 
@@ -45,20 +41,3 @@ def fetch_quotes(symbols):
         except Exception as e:  # one bad symbol must not sink the rest
             out[sym] = {"error": str(e)}
     return out
-
-
-class handler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        qs = parse_qs(urlparse(self.path).query)
-        raw = qs.get("symbols", [",".join(DEFAULT_SYMBOLS)])[0]
-        symbols = [s.strip() for s in raw.split(",") if s.strip()][:MAX_SYMBOLS]
-        try:
-            body = json.dumps(fetch_quotes(symbols), ensure_ascii=False)
-            status = 200
-        except Exception as e:
-            body, status = json.dumps({"error": str(e)}), 502
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Cache-Control", "no-store")
-        self.end_headers()
-        self.wfile.write(body.encode())
