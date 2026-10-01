@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { api } from "./api.js";
+import { fileToCsv } from "./readTable.js";
 
 const ACTION = { buy: "קנייה", sell: "מכירה", watch: "מעקב" };
 
@@ -14,9 +15,14 @@ export default function ImportCsv({ onDone }) {
     const file = e.target.files[0];
     if (!file) return;
     setFileName(file.name);
-    setText(await file.text());
     setPreview(null);
     setError("");
+    try {
+      setText(await fileToCsv(file));
+    } catch {
+      setText("");
+      setError("לא ניתן לקרוא את הקובץ");
+    }
   };
 
   const call = async (path, after) => {
@@ -34,8 +40,8 @@ export default function ImportCsv({ onDone }) {
   return (
     <section>
       <div className="card add">
-        <label>קובץ CSV
-          <input type="file" accept=".csv,text/csv" onChange={pick} />
+        <label>קובץ CSV או Excel
+          <input type="file" accept=".csv,.xlsx,.xls,text/csv" onChange={pick} />
         </label>
         <div className="muted" dir="ltr">symbol,action,date,quantity,price,gross,fees,tax,fx_rate</div>
         <button disabled={busy || !text} onClick={() => call("/api/import/preview", setPreview)}>
