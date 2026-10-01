@@ -6,6 +6,13 @@ import AddForm from "./AddForm.jsx";
 import ImportCsv from "./ImportCsv.jsx";
 import { api } from "./api.js";
 
+const PERIODS = [
+  ["today", "היום"],
+  ["week", "מתחילת השבוע"],
+  ["d7", "7 ימים"],
+  ["month", "חודש"],
+];
+
 const TABS = [
   ["dashboard", "דשבורד"],
   ["buy", "רכישות"],
@@ -17,6 +24,7 @@ const TABS = [
 export default function App() {
   const [authed, setAuthed] = useState(null);
   const [tab, setTab] = useState("dashboard");
+  const [period, setPeriod] = useState("today");
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -84,17 +92,24 @@ export default function App() {
           <button onClick={logout}>התנתקות</button>
         </div>
       </header>
+      {["dashboard", "buy", "watch"].includes(tab) && (
+        <div className="periods">
+          {PERIODS.map(([k, label]) => (
+            <button key={k} className={period === k ? "active" : ""} onClick={() => setPeriod(k)}>{label}</button>
+          ))}
+        </div>
+      )}
       {error && <p className="error">{error}</p>}
       {!data ? (
         <p className="muted">טוען…</p>
       ) : tab === "dashboard" ? (
-        <Dashboard data={data} />
+        <Dashboard data={data} period={period} />
       ) : tab === "add" ? (
         <AddForm onDone={async () => { await refresh(); setTab("buy"); }} />
       ) : tab === "import" ? (
         <ImportCsv onDone={async () => { await refresh(); setTab("buy"); }} />
       ) : (
-        <StockList kind={tab} rows={data[tab]} reload={load} onError={handle} />
+        <StockList kind={tab} rows={data[tab]} period={period} reload={load} onError={handle} />
       )}
     </div>
   );

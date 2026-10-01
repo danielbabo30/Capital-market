@@ -1,6 +1,6 @@
-import { api, cur, num, signed } from "./api.js";
+import { api, cur, num, periodStatus, signed } from "./api.js";
 
-export default function StockList({ kind, rows, reload, onError }) {
+export default function StockList({ kind, rows, period, reload, onError }) {
   const del = async (path, msg) => {
     if (!confirm(msg)) return;
     try { await api(path, { method: "DELETE" }); await reload(); } catch (e) { onError(e); }
@@ -10,6 +10,8 @@ export default function StockList({ kind, rows, reload, onError }) {
     <section>
       {rows.map((r) => {
         const cls = r.pl_ils > 0 ? "pos" : r.pl_ils < 0 ? "neg" : "";
+        const pr = r.periods[period];
+        const pcls = (pr.pl_ils ?? pr.pct) > 0 ? "pos" : (pr.pl_ils ?? pr.pct) < 0 ? "neg" : "";
         return (
           <div className="card" key={r.symbol}>
             <div className="row">
@@ -23,8 +25,22 @@ export default function StockList({ kind, rows, reload, onError }) {
                 {r.stale && <b className="neg"> · לא עודכן</b>}
               </span>
             </div>
+            {kind === "watch" && (
+              <div className={`row ${pcls}`}>
+                <span>שינוי בתקופה</span>
+                {pr.status === "ok" ? <span dir="ltr">{signed(pr.pct)}%</span> : <span className="muted">{periodStatus[pr.status]}</span>}
+              </div>
+            )}
             {kind === "buy" && (
               <>
+                <div className={`row ${pcls}`}>
+                  <span>רווח בתקופה</span>
+                  {pr.status === "ok" ? (
+                    <span>₪{signed(pr.pl_ils)} <span dir="ltr">({signed(pr.pct)}%)</span></span>
+                  ) : (
+                    <span className="muted">{periodStatus[pr.status]}</span>
+                  )}
+                </div>
                 <div className="row"><span>כמות</span><span>{r.qty}</span></div>
                 <div className="row"><span>שער ממוצע</span><span dir="ltr">{cur(r.currency)}{num(r.avg_price)}</span></div>
                 <div className="row"><span>שווי</span><span>₪{num(r.value_ils)}</span></div>

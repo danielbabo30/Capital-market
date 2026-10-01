@@ -13,3 +13,5 @@ const nf = new Intl.NumberFormat("he-IL", { minimumFractionDigits: 2, maximumFra
 export const num = (x) => (x == null ? "—" : nf.format(x));
 export const signed = (x) => (x == null ? "—" : (x > 0 ? "+" : "") + nf.format(x));
 export const cur = (c) => (c === "USD" ? "$" : "₪");
+
+export const periodStatus = { not_opened: "טרם נפתח", no_data: "אין נתון", none: "אין נתון" };

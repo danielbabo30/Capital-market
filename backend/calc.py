@@ -33,3 +33,22 @@ def summarize(positions):
     cost = sum(p["cost"] for p in priced)
     pl = value - cost
     return {"value": value, "cost": cost, "pl": pl, "pct": pl / cost if cost else None}
+
+
+def period_position(lots, scale, price, fx_now, currency, base_price, start):
+    """P/L of one holding over a period. Each lot is measured from the period's opening price,
+    or from its own purchase price if it was bought on/after the period start.
+    scale = remaining qty / bought qty (sales shrink every lot equally, like the average-cost model).
+    USD: converted at the current rate (short periods). Returns pl and base value in ILS."""
+    mult = 1.0
+    if currency == "USD":
+        if fx_now is None:
+            return None
+        mult = fx_now
+    pl = base_val = 0.0
+    for lot in lots:
+        base = lot["price"] if lot["date"] >= start else base_price
+        q = lot["quantity"] * scale
+        pl += (price - base) * q * mult
+        base_val += base * q * mult
+    return {"pl": pl, "base": base_val, "pct": pl / base_val if base_val else None}

@@ -1,15 +1,25 @@
-import { num, signed } from "./api.js";
+import { num, periodStatus, signed } from "./api.js";
 
 const NAMES = { TLV: "בורסת תל אביב", US: "וול סטריט", FX: "שער דולר" };
 
-export default function Dashboard({ data }) {
+export default function Dashboard({ data, period }) {
   const s = data.summary;
+  const pp = data.periods[period];
+  const pcls = pp.pl_ils > 0 ? "pos" : pp.pl_ils < 0 ? "neg" : "";
   const cls = s.pl_ils > 0 ? "pos" : s.pl_ils < 0 ? "neg" : "";
   return (
     <section>
       <div className="card">
         <div className="muted">שווי תיק</div>
         <div className="big">₪{num(s.value_ils)}</div>
+        <div className="muted">רווח/הפסד בתקופה</div>
+        {pp.status === "ok" ? (
+          <div className={`big ${pcls}`}>
+            ₪{signed(pp.pl_ils)} <span dir="ltr">({signed(pp.pct)}%)</span>
+          </div>
+        ) : (
+          <div className="big muted">{period === "today" ? periodStatus.not_opened : periodStatus.none}</div>
+        )}
         <div className="muted">רווח/הפסד כולל</div>
         <div className={`big ${cls}`}>
           ₪{signed(s.pl_ils)} <span dir="ltr">({signed(s.pl_pct)}%)</span>

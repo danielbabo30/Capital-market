@@ -29,13 +29,15 @@ def fetch_quotes(symbols):
             currency = tickers.tickers[sym].fast_info.get("currency")
             price = float(df["Close"].iloc[-1])
             day_open = float(df["Open"].iloc[0])
-            if currency == "ILA":  # agorot -> shekels, the only place this happens
+            ila = currency == "ILA"
+            if ila:  # agorot -> shekels, the only place this happens
                 price, day_open, currency = price / 100, day_open / 100, "ILS"
             qt = df.index[-1]
             out[sym] = {
                 "price": round(price, 4),
                 "day_open": round(day_open, 4),
                 "currency": currency,
+                "ila": ila,
                 "quote_time": qt.isoformat(),  # trading time of the quote, not fetch time
                 "quote_time_utc": qt.astimezone(timezone.utc).isoformat(),
             }
@@ -73,3 +75,20 @@ def fx_on(date):
     if close.empty:
         raise ValueError("no fx rate for date")
     return round(float(close.iloc[0]), 4)
+
+
+def fetch_bars(symbols, ila=()):
+    """Daily open/close for ~2 months, one bulk call. Symbols in `ila` are agorot -> shekels here."""
+    data = yf.download(symbols, period="2mo", interval="1d", group_by="ticker",
+                       auto_adjust=False, progress=False, threads=True)
+    out = {}
+    for sym in symbols:
+        try:
+            df = data[sym] if isinstance(data.columns, pd.MultiIndex) else data
+            df = df.dropna(subset=["Open"])
+            div = 100 if sym in ila else 1
+            out[sym] = [(idx.date().isoformat(), round(float(r["Open"]) / div, 4), round(float(r["Close"]) / div, 4))
+                        for idx, r in df.iterrows()]
+        except Exception:
+            out[sym] = []
+    return out

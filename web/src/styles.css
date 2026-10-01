@@ -25,3 +25,6 @@ button.link { border: none; background: none; color: #2563eb; padding: 0; font-s
 .add input[dir="ltr"] { text-align: left; }
 details summary { cursor: pointer; font-size: 0.9rem; }
 .prev { flex-wrap: wrap; font-size: 0.9rem; border-top: 1px solid #8882; padding-top: 4px; }
+.periods { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.periods button { font-size: 0.9rem; padding: 4px 10px; border-radius: 16px; }
+.periods button.active { background: #2563eb; color: #fff; border-color: #2563eb; }

@@ -1,7 +1,7 @@
 import re
 from datetime import date as date_cls, datetime, timezone
 
-from . import calc, db, markets
+from . import calc, db, markets, periods
 from . import quotes as yq
 
 SYMBOL_RE = re.compile(r"^[A-Z0-9.\-=^]{1,15}$")
@@ -24,7 +24,10 @@ def refresh(now=None):
     if db.query("SELECT 1 FROM stocks WHERE currency = 'USD' LIMIT 1"):
         symbols.add("ILS=X")
     fetched = {r[0]: _dt(r[1]) for r in db.query("SELECT symbol, fetched_at FROM quotes")}
-    due = sorted(s for s in symbols if markets.needs_refresh(markets.market_of(s), fetched.get(s), now))
+    with_bars = {r[0] for r in db.query("SELECT DISTINCT symbol FROM daily_bars")}
+    due = sorted(s for s in symbols
+                 if markets.needs_refresh(markets.market_of(s), fetched.get(s), now)
+                 or (s != "ILS=X" and s not in with_bars))
     if not due:
         return {"pulled": [], "failed": []}
     try:
@@ -42,6 +45,15 @@ def refresh(now=None):
             stmts.append(("INSERT OR REPLACE INTO quotes (symbol, price, day_open, quote_time, fetched_at) "
                           "VALUES (?, ?, ?, ?, ?)", [sym, q["price"], q["day_open"], q["quote_time_utc"], now.isoformat()]))
             stmts.append(("INSERT OR REPLACE INTO quote_status (symbol, failed) VALUES (?, 0)", [sym]))
+    stock_syms = [s for s in pulled if s != "ILS=X"]
+    if stock_syms:  # daily history for the period bases: one more bulk call
+        try:
+            ila = {s for s in stock_syms if data[s].get("ila")}
+            for sym, rows in yq.fetch_bars(stock_syms, ila).items():
+                stmts += [("INSERT OR REPLACE INTO daily_bars (symbol, date, open, close) VALUES (?, ?, ?, ?)",
+                           [sym, d, o, c]) for d, o, c in rows]
+        except Exception:
+            pass  # old bars stay; quotes are still saved
     db.run(stmts)
     return {"pulled": pulled, "failed": failed}
 
@@ -122,6 +134,12 @@ def portfolio():
     quotes = {r[0]: r for r in db.query("SELECT symbol, price, day_open, quote_time, fetched_at FROM quotes")}
     failed = {r[0] for r in db.query("SELECT symbol FROM quote_status WHERE failed = 1")}
     fx_now = quotes["ILS=X"][1] if "ILS=X" in quotes else None
+    bars = {}
+    for sym, d, o in db.query("SELECT symbol, date, open FROM daily_bars ORDER BY date"):
+        bars.setdefault(sym, []).append((d, o))
+    now = _now()
+    port_pl = {p: 0.0 for p in periods.PERIODS}
+    port_base = {p: 0.0 for p in periods.PERIODS}
 
     buys, sold, tx_list = {}, {}, {}
     for id_, sym, typ, date, qty, price, _g, _f, _t, fx in txs:
@@ -148,11 +166,30 @@ def portfolio():
             "google_url": f"https://www.google.com/finance/quote/{sym.split('.')[0]}:{exch}" if exch else None,
             "yahoo_url": f"https://finance.yahoo.com/quote/{sym}",
         }
+        m = markets.market_of(sym)
+        today = now.astimezone(markets.TZ[m]).date()
+        quote_open = q[2] if q and qt and qt.astimezone(markets.TZ[m]).date() == today else None
+        pb = periods.bases(bars.get(sym, []), today, quote_open)
         if lst == "watch":
+            row["periods"] = {
+                p: {"status": st, "pct": _pct((price - base) / base) if st == "ok" and price is not None else None}
+                for p, (_s, base, st) in pb.items()
+            }
             watch_rows.append(row)
             continue
         pos = calc.position(buys.get(sym, []), sold.get(sym, 0), price, fx_now, currency)
         positions.append(pos)
+        row["periods"] = {}
+        bought = sum(b["quantity"] for b in buys.get(sym, []))
+        for p, (start, base, st) in pb.items():
+            res = None
+            if st == "ok" and price is not None and bought > 0 and pos["qty"] > 0:
+                res = calc.period_position(tx_list[sym], pos["qty"] / bought, price, fx_now, currency, base, start)
+            if res:
+                port_pl[p] += res["pl"]
+                port_base[p] += res["base"]
+            row["periods"][p] = {"status": st if res or st != "ok" else "no_data",
+                                 "pl_ils": _money(res and res["pl"]), "pct": _pct(res and res["pct"])}
         row.update(
             qty=pos["qty"], avg_price=None if pos["avg_price"] is None else round(pos["avg_price"], 4),
             value_ils=_money(pos.get("value")), cost_ils=_money(pos.get("cost")),
@@ -166,6 +203,9 @@ def portfolio():
     return {
         "summary": {"value_ils": _money(s["value"]), "cost_ils": _money(s["cost"]),
                     "pl_ils": _money(s["pl"]), "pl_pct": _pct(s["pct"])},
+        "periods": {p: {"status": "ok" if port_base[p] else "none", "pl_ils": _money(port_pl[p]),
+                        "pct": _pct(port_pl[p] / port_base[p]) if port_base[p] else None}
+                    for p in periods.PERIODS},
         "as_of": {m: v[1] for m, v in as_of.items()},
         "buy": buy_rows, "watch": watch_rows,
     }
