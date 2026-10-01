@@ -19,6 +19,8 @@ export default function Login({ onSuccess }) {
       if (r.status === 429) {
         const { detail } = await r.json();
         setError(`נעול. נסה שוב בעוד ${Math.ceil(detail.locked_seconds / 60)} דקות.`);
+      } else if (r.status >= 500) {
+        setError("שגיאת שרת. נסה שוב מאוחר יותר.");
       } else {
         setError("קוד שגוי");
       }

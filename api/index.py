@@ -58,3 +58,16 @@ def quotes(symbols: str = "TEVA.TA,AAPL,ILS=X"):
 def init_db():
     db.init_schema()
     return {"ok": True}
+
+
+@app.get("/api/health")
+def health():
+    """Reports which env vars exist (never their values) and whether Turso answers."""
+    names = ["APP_PIN", "SESSION_SECRET", "TURSO_DATABASE_URL", "TURSO_AUTH_TOKEN"]
+    out = {"env": {n: bool(os.environ.get(n)) for n in names}}
+    try:
+        db.query("SELECT 1")
+        out["db"] = "ok"
+    except Exception as e:
+        out["db"] = type(e).__name__
+    return out
