@@ -3,6 +3,7 @@ import Login from "./Login.jsx";
 import Dashboard from "./Dashboard.jsx";
 import StockList from "./StockList.jsx";
 import AddForm from "./AddForm.jsx";
+import ImportCsv from "./ImportCsv.jsx";
 import { api } from "./api.js";
 
 const TABS = [
@@ -10,6 +11,7 @@ const TABS = [
   ["buy", "רכישות"],
   ["watch", "מעקב"],
   ["add", "הוספה"],
+  ["import", "ייבוא"],
 ];
 
 export default function App() {
@@ -89,6 +91,8 @@ export default function App() {
         <Dashboard data={data} />
       ) : tab === "add" ? (
         <AddForm onDone={async () => { await refresh(); setTab("buy"); }} />
+      ) : tab === "import" ? (
+        <ImportCsv onDone={async () => { await refresh(); setTab("buy"); }} />
       ) : (
         <StockList kind={tab} rows={data[tab]} reload={load} onError={handle} />
       )}

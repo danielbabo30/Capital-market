@@ -8,7 +8,7 @@ from typing import Optional  # noqa: E402
 
 from pydantic import BaseModel  # noqa: E402
 
-from backend import auth, db, service  # noqa: E402
+from backend import auth, db, importer, service  # noqa: E402
 
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 
@@ -98,3 +98,17 @@ def delete_stock(symbol: str):
 @app.delete("/api/transactions/{tx_id}", dependencies=[Depends(require_session)])
 def delete_transaction(tx_id: int):
     return _guard(service.delete_transaction, tx_id) or {"ok": True}
+
+
+class CsvBody(BaseModel):
+    csv: str
+
+
+@app.post("/api/import/preview", dependencies=[Depends(require_session)])
+def import_preview(body: CsvBody):
+    return _guard(importer.preview, body.csv)
+
+
+@app.post("/api/import/commit", dependencies=[Depends(require_session)])
+def import_commit(body: CsvBody):
+    return _guard(importer.commit, body.csv)
