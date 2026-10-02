@@ -1,4 +1,5 @@
-import { api, cur, num, periodStatus, px, signed } from "./api.js";
+import { Logo, LogoControls } from "./Logo.jsx";
+import { api, cur, num, periodStatus, px, signed, ils } from "./api.js";
 
 export default function StockList({ kind, rows, period, reload, onError }) {
   const del = async (path, msg) => {
@@ -23,7 +24,7 @@ export default function StockList({ kind, rows, period, reload, onError }) {
         return (
           <div className="card" key={r.symbol}>
             <div className="row">
-              <strong>{r.symbol}</strong>
+              <span className="namecell"><Logo row={r} /><strong>{r.symbol}</strong></span>
               <span className="muted">{r.name}</span>
             </div>
             <div className="row">
@@ -44,22 +45,22 @@ export default function StockList({ kind, rows, period, reload, onError }) {
                 <div className={`row ${pcls}`}>
                   <span>רווח בתקופה</span>
                   {pr.status === "ok" ? (
-                    <span>₪{signed(pr.pl_ils)} <span dir="ltr">({signed(pr.pct)}%)</span></span>
+                    <span>{ils(pr.pl_ils, true)} <span dir="ltr">({signed(pr.pct)}%)</span></span>
                   ) : (
                     <span className="muted">{periodStatus[pr.status]}</span>
                   )}
                 </div>
                 <div className="row"><span>כמות</span><span>{r.qty}</span></div>
                 <div className="row"><span>שער ממוצע</span><span dir="ltr">{cur(r.currency)}{px(r.avg_price)}</span></div>
-                <div className="row"><span>שווי</span><span>₪{num(r.value_ils)}</span></div>
+                <div className="row"><span>שווי</span><span>{ils(r.value_ils)}</span></div>
                 <div className={`row ${cls}`}>
                   <span>רווח כולל</span>
-                  <span>₪{signed(r.pl_ils)} <span dir="ltr">({signed(r.pl_pct)}%)</span></span>
+                  <span>{ils(r.pl_ils, true)} <span dir="ltr">({signed(r.pl_pct)}%)</span></span>
                 </div>
                 {r.currency === "USD" && r.pl_ils != null && (
                   <div className="row muted">
                     <span>מזה: מניה / מטבע</span>
-                    <span>₪{signed(r.stock_pl_ils)} / ₪{signed(r.fx_pl_ils)}</span>
+                    <span>{ils(r.stock_pl_ils, true)} / {ils(r.fx_pl_ils, true)}</span>
                   </div>
                 )}
                 <details>
@@ -74,6 +75,7 @@ export default function StockList({ kind, rows, period, reload, onError }) {
               </>
             )}
             <div className="row links">
+              <LogoControls row={r} reload={reload} onError={onError} />
               {r.manual && <button className="link" onClick={() => setPrice(r)}>עדכן שער</button>}
               {r.google_url && <a href={r.google_url} target="_blank" rel="noreferrer">Google Finance</a>}
               {r.yahoo_url && <a href={r.yahoo_url} target="_blank" rel="noreferrer">Yahoo</a>}

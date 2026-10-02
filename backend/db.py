@@ -16,6 +16,7 @@ SCHEMA = [
         symbol TEXT NOT NULL, date TEXT NOT NULL, open REAL, close REAL, PRIMARY KEY (symbol, date))""",
     """CREATE TABLE IF NOT EXISTS quote_status (symbol TEXT PRIMARY KEY, failed INTEGER NOT NULL DEFAULT 0)""",
     """CREATE TABLE IF NOT EXISTS manual_prices (symbol TEXT PRIMARY KEY, price REAL NOT NULL, updated_at TEXT NOT NULL)""",
+    """CREATE TABLE IF NOT EXISTS stock_logos (symbol TEXT PRIMARY KEY, data TEXT NOT NULL)""",
     """CREATE TABLE IF NOT EXISTS login_state (
         id INTEGER PRIMARY KEY CHECK (id = 1), fails INTEGER NOT NULL DEFAULT 0, locked_until INTEGER NOT NULL DEFAULT 0)""",
     "INSERT OR IGNORE INTO login_state (id) VALUES (1)",

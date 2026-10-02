@@ -154,3 +154,18 @@ def add_manual(body: Manual):
 @app.post("/api/manual/{symbol}/price", dependencies=[Depends(require_session)])
 def set_manual_price(symbol: str, body: ManualPrice):
     return _guard(service.set_manual_price, symbol.upper(), body.price) or {"ok": True}
+
+
+class Logo(BaseModel):
+    data: str
+
+
+@app.post("/api/stocks/{symbol}/logo", dependencies=[Depends(require_session)])
+def set_logo(symbol: str, body: Logo):
+    return _guard(service.set_logo, symbol.upper(), body.data) or {"ok": True}
+
+
+@app.delete("/api/stocks/{symbol}/logo", dependencies=[Depends(require_session)])
+def delete_logo(symbol: str):
+    service.delete_logo(symbol.upper())
+    return {"ok": True}

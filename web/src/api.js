@@ -1,3 +1,5 @@
+import { createElement } from "react";
+
 export async function api(path, options = {}) {
   const r = await fetch(path, {
     ...options,
@@ -18,3 +20,8 @@ export const signed = (x) => (x == null ? "—" : (x > 0 ? "+" : "") + nf.format
 export const cur = (c) => (c === "USD" ? "$" : "₪");
 
 export const periodStatus = { not_opened: "טרם נפתח", no_data: "אין נתון", none: "אין נתון" };
+
+// Shekel amount as one left-to-right unit, so the sign and ₪ never flip inside RTL text.
+export const ils = (x, sign = false) =>
+  createElement("bdi", { dir: "ltr" },
+    x == null ? "—" : (x < 0 ? "−" : sign && x > 0 ? "+" : "") + "₪" + nf.format(Math.abs(x)));

@@ -45,7 +45,7 @@ export default function App() {
     }
   }, []);
 
-  // Called on app entry and by the refresh button (server applies the 5-minute cache).
+  // Called by the refresh button and after adding data (server applies the 5-minute cache).
   const refresh = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -64,11 +64,8 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (authed) {
-      load();
-      refresh();
-    }
-  }, [authed, load, refresh]);
+    if (authed) load(); // entry shows what is already saved; Yahoo is pulled only by the refresh button
+  }, [authed, load]);
 
   const logout = async () => {
     await fetch("/api/logout", { method: "POST" });
@@ -82,6 +79,7 @@ export default function App() {
   return (
     <div className="app">
       <header>
+        <div className="brand">מעקב מניות</div>
         <nav>
           {TABS.map(([k, label]) => (
             <button key={k} className={tab === k ? "active" : ""} onClick={() => setTab(k)}>

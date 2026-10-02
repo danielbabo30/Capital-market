@@ -106,7 +106,7 @@ def add_stock(symbol, lst, date=None, price=None, quantity=None, fx_rate=None, n
 
 def delete_stock(symbol):
     db.run([(f"DELETE FROM {t} WHERE symbol = ?", [symbol])
-            for t in ("transactions", "quotes", "quote_status", "daily_bars", "manual_prices", "stocks")])
+            for t in ("transactions", "quotes", "quote_status", "daily_bars", "manual_prices", "stock_logos", "stocks")])
 
 
 def delete_transaction(tx_id):
@@ -140,7 +140,35 @@ def _manual_prices():
     return {r[0]: (r[1], _dt(r[2])) for r in rows}
 
 
+def _logos():
+    try:
+        return {r[0]: r[1] for r in db.query("SELECT symbol, data FROM stock_logos")}
+    except RuntimeError:  # table not created yet on an older database
+        db.init_schema()
+        return {}
+
+
+MAX_LOGO = 60_000  # characters of data URL; the browser shrinks images to ~96px before sending
+
+
+def set_logo(symbol, data):
+    if not db.query("SELECT 1 FROM stocks WHERE symbol = ?", [symbol]):
+        raise LookupError("המניה לא נמצאה")
+    if not (isinstance(data, str) and data.startswith(("data:image/png;base64,", "data:image/jpeg;base64,", "data:image/webp;base64,"))):
+        raise ValueError("קובץ תמונה לא תקין")
+    if len(data) > MAX_LOGO:
+        raise ValueError("התמונה גדולה מדי")
+    _logos()  # make sure the table exists
+    db.query("INSERT OR REPLACE INTO stock_logos (symbol, data) VALUES (?, ?)", [symbol, data])
+
+
+def delete_logo(symbol):
+    _logos()
+    db.query("DELETE FROM stock_logos WHERE symbol = ?", [symbol])
+
+
 def portfolio():
+    logos = _logos()
     manual = _manual_prices()
     stocks = db.query("SELECT symbol, name, list, currency, exchange FROM stocks ORDER BY added_at")
     txs = db.query("SELECT id, symbol, type, date, quantity, price, gross, fees, tax, fx_rate "
@@ -181,7 +209,7 @@ def portfolio():
         row = {
             "symbol": sym, "name": name, "currency": currency, "price": price,
             "as_of": label, "stale": False if sym in manual else (sym in failed or q is None),
-            "manual": sym in manual,
+            "manual": sym in manual, "logo": logos.get(sym),
             "google_url": None if sym in manual else (f"https://www.google.com/finance/quote/{sym.split('.')[0]}:{exch}" if exch else None),
             "yahoo_url": None if sym in manual else f"https://finance.yahoo.com/quote/{sym}",
         }

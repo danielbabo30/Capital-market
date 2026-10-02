@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { cur, num, periodStatus, px, signed } from "./api.js";
+import { Logo } from "./Logo.jsx";
+import { cur, num, periodStatus, px, signed, ils } from "./api.js";
 
 const NAMES = { TLV: "בורסת תל אביב", US: "וול סטריט", FX: "שער דולר" };
 
@@ -56,18 +57,23 @@ function HoldingsTable({ rows, period }) {
           {items.map(({ r, name, pct, pl, value, total, avg, qty, status }) => (
             <tr key={r.symbol}>
               <td>
-                <div>{name}</div>
-                <div className="muted" dir="ltr">{r.symbol}</div>
+                <div className="namecell">
+                  <Logo row={r} />
+                  <div>
+                    <div>{name}</div>
+                    <div className="muted" dir="ltr">{r.symbol}</div>
+                  </div>
+                </div>
               </td>
               <td className={clsOf(pct)} dir="ltr">
                 {status === "ok" ? `${signed(pct)}%` : <span className="muted">{periodStatus[status]}</span>}
               </td>
-              <td className={clsOf(pl)}>{status === "ok" ? `₪${signed(pl)}` : "—"}</td>
-              <td>{value == null ? "—" : `₪${num(value)}`}</td>
+              <td className={clsOf(pl)}>{status === "ok" ? ils(pl, true) : "—"}</td>
+              <td>{ils(value)}</td>
               <td className={clsOf(total)}>
                 {total == null ? "—" : (
                   <>
-                    <div>₪{signed(total)}</div>
+                    <div>{ils(total, true)}</div>
                     <div dir="ltr">{signed(r.pl_pct)}%</div>
                   </>
                 )}
@@ -90,30 +96,29 @@ export default function Dashboard({ data, period }) {
   const cls = s.pl_ils > 0 ? "pos" : s.pl_ils < 0 ? "neg" : "";
   return (
     <section>
-      <div className="card">
+      <div className="pair">
+      <div className="card hero">
         <div className="muted">שווי תיק</div>
-        <div className="big">₪{num(s.value_ils)}</div>
+        <div className="big">{ils(s.value_ils)}</div>
         <div className="muted">רווח/הפסד בתקופה</div>
         {pp.status === "ok" ? (
           <div className={`big ${pcls}`}>
-            ₪{signed(pp.pl_ils)} <span dir="ltr">({signed(pp.pct)}%)</span>
+            {ils(pp.pl_ils, true)} <span dir="ltr">({signed(pp.pct)}%)</span>
           </div>
         ) : (
           <div className="big muted">{period === "today" ? periodStatus.not_opened : periodStatus.none}</div>
         )}
         <div className="muted">רווח/הפסד כולל</div>
         <div className={`big ${cls}`}>
-          ₪{signed(s.pl_ils)} <span dir="ltr">({signed(s.pl_pct)}%)</span>
+          {ils(s.pl_ils, true)} <span dir="ltr">({signed(s.pl_pct)}%)</span>
         </div>
       </div>
       <div className="card">
-        <div className="muted">רווח ממומש (מכירות)</div>
-        <div className="row">
-          <span>לפני מס</span><span className={data.realized.before_tax > 0 ? "pos" : data.realized.before_tax < 0 ? "neg" : ""}>₪{signed(data.realized.before_tax)}</span>
-        </div>
-        <div className="row">
-          <span>אחרי מס</span><span className={data.realized.after_tax > 0 ? "pos" : data.realized.after_tax < 0 ? "neg" : ""}>₪{signed(data.realized.after_tax)}</span>
-        </div>
+        <div className="muted">רווח ממומש לפני מס</div>
+        <div className={`big ${data.realized.before_tax > 0 ? "pos" : data.realized.before_tax < 0 ? "neg" : ""}`}>{ils(data.realized.before_tax, true)}</div>
+        <div className="muted">רווח ממומש אחרי מס</div>
+        <div className={`big ${data.realized.after_tax > 0 ? "pos" : data.realized.after_tax < 0 ? "neg" : ""}`}>{ils(data.realized.after_tax, true)}</div>
+      </div>
       </div>
       <HoldingsTable rows={data.buy} period={period} />
       <div className="card">
