@@ -28,3 +28,8 @@ details summary { cursor: pointer; font-size: 0.9rem; }
 .periods { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
 .periods button { font-size: 0.9rem; padding: 4px 10px; border-radius: 16px; }
 .periods button.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+.tablewrap { overflow-x: auto; padding: 4px; }
+table { border-collapse: collapse; width: 100%; font-size: 0.9rem; white-space: nowrap; }
+th { cursor: pointer; text-align: right; font-weight: 600; padding: 8px 6px; border-bottom: 1px solid #8884; user-select: none; }
+td { padding: 8px 6px; border-bottom: 1px solid #8882; text-align: right; }
+.app { max-width: 900px; }
