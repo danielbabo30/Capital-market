@@ -14,6 +14,14 @@ export default function StockList({ kind, rows, period, reload, onError }) {
       await reload();
     } catch (e) { onError(e); }
   };
+  const setFx = async (t) => {
+    const v = prompt("שער הדולר ביום הרכישה:", t.fx_rate ?? "");
+    if (v == null || v === "") return;
+    try {
+      await api(`/api/transactions/${t.id}/fx`, { method: "POST", body: JSON.stringify({ fx_rate: Number(v) }) });
+      await reload();
+    } catch (e) { onError(e); }
+  };
   if (rows.length === 0) return <p className="muted">הרשימה ריקה. אפשר להוסיף מניה בלשונית "הוספה".</p>;
   return (
     <section>
@@ -67,8 +75,14 @@ export default function StockList({ kind, rows, period, reload, onError }) {
                   <summary>רכישות ({r.transactions.length})</summary>
                   {r.transactions.map((t) => (
                     <div className="row" key={t.id}>
-                      <span>{t.date} · {t.quantity} × {cur(r.currency)}{px(t.price)}</span>
-                      <button className="link" onClick={() => del(`/api/transactions/${t.id}`, "למחוק את הרכישה?")}>מחק</button>
+                      <span>
+                        {t.date} · {t.quantity} × {cur(r.currency)}{px(t.price)}
+                        {r.currency === "USD" && <span className="muted"> · דולר {px(t.fx_rate)}</span>}
+                      </span>
+                      <span>
+                        {r.currency === "USD" && <button className="link" onClick={() => setFx(t)}>שער דולר</button>}{" "}
+                        <button className="link" onClick={() => del(`/api/transactions/${t.id}`, "למחוק את הרכישה?")}>מחק</button>
+                      </span>
                     </div>
                   ))}
                 </details>

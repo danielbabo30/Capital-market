@@ -169,3 +169,22 @@ def set_logo(symbol: str, body: Logo):
 def delete_logo(symbol: str):
     service.delete_logo(symbol.upper())
     return {"ok": True}
+
+
+class Fx(BaseModel):
+    fx_rate: float
+
+
+class FxReset(BaseModel):
+    date: str
+    fx_rate: Optional[float] = None
+
+
+@app.post("/api/transactions/{tx_id}/fx", dependencies=[Depends(require_session)])
+def set_tx_fx(tx_id: int, body: Fx):
+    return _guard(service.set_tx_fx, tx_id, body.fx_rate) or {"ok": True}
+
+
+@app.post("/api/fx/reset", dependencies=[Depends(require_session)])
+def reset_fx(body: FxReset):
+    return _guard(service.reset_fx, body.date, body.fx_rate)

@@ -109,7 +109,7 @@ export default function App() {
       ) : tab === "sales" ? (
         <Sales onError={handle} />
       ) : tab === "import" ? (
-        <ImportCsv onDone={async () => { await refresh(); setTab("buy"); }} />
+        <ImportCsv reload={load} onDone={async () => { await refresh(); setTab("buy"); }} />
       ) : (
         <StockList kind={tab} rows={data[tab]} period={period} reload={load} onError={handle} />
       )}

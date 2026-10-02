@@ -368,3 +368,31 @@ def set_manual_price(symbol, price, now=None):
         raise LookupError("זו לא החזקה עם מחיר ידני")
     db.query("UPDATE manual_prices SET price = ?, updated_at = ? WHERE symbol = ?",
              [price, (now or _now()).isoformat(), symbol])
+
+
+def set_tx_fx(tx_id, fx_rate):
+    if not (fx_rate and fx_rate > 0):
+        raise ValueError("שער דולר חייב להיות חיובי")
+    rows = db.query("SELECT t.type, s.currency FROM transactions t JOIN stocks s ON s.symbol = t.symbol WHERE t.id = ?", [tx_id])
+    if not rows or rows[0][0] != "buy" or rows[0][1] != "USD":
+        raise LookupError("אפשר לעדכן שער דולר רק לרכישה של מניה אמריקאית")
+    db.query("UPDATE transactions SET fx_rate = ? WHERE id = ?", [fx_rate, tx_id])
+
+
+def reset_fx(date, fx_rate=None):
+    """For purchases whose real date/rate is unknown: set every USD purchase on `date` to one rate
+    (default: today's), so the currency effect starts from zero instead of from a made-up date."""
+    if fx_rate is None:
+        r = db.query("SELECT price FROM quotes WHERE symbol = 'ILS=X'")
+        if not r:
+            raise ValueError("אין שער דולר שמור. לחץ רענון ונסה שוב")
+        fx_rate = r[0][0]
+    if not fx_rate > 0:
+        raise ValueError("שער דולר חייב להיות חיובי")
+    ids = [r[0] for r in db.query(
+        "SELECT t.id FROM transactions t JOIN stocks s ON s.symbol = t.symbol "
+        "WHERE t.type = 'buy' AND s.currency = 'USD' AND t.date = ?", [date])]
+    if not ids:
+        raise LookupError("לא נמצאו רכישות אמריקאיות בתאריך הזה")
+    db.run([("UPDATE transactions SET fx_rate = ? WHERE id = ?", [fx_rate, i]) for i in ids])
+    return {"updated": len(ids), "fx_rate": fx_rate}

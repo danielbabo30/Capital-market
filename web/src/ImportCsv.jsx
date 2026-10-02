@@ -4,7 +4,31 @@ import { fileToCsv } from "./readTable.js";
 
 const ACTION = { buy: "קנייה", sell: "מכירה", watch: "מעקב" };
 
-export default function ImportCsv({ onDone }) {
+function FxReset({ onDone }) {
+  const [date, setDate] = useState("2025-01-01");
+  const [msg, setMsg] = useState("");
+  const run = async () => {
+    if (!confirm(`להגדיר לכל הרכישות האמריקאיות מתאריך ${date} את שער הדולר של היום?`)) return;
+    try {
+      const r = await api("/api/fx/reset", { method: "POST", body: JSON.stringify({ date }) });
+      setMsg(`עודכנו ${r.updated} רכישות לשער ${r.fx_rate}`);
+      onDone();
+    } catch (e) {
+      setMsg(e.message);
+    }
+  };
+  return (
+    <div className="card add">
+      <strong>תיקון שער דולר לרכישות ללא תאריך אמיתי</strong>
+      <p className="muted">אם הוזן תאריך קנייה בדוי, שער הדולר של אותו יום יוצר רווח או הפסד מט"ח מדומה. הכפתור מגדיר לכל הרכישות האמריקאיות בתאריך הזה את שער הדולר של היום, כך שרווח המטבע מתחיל מאפס.</p>
+      <label>תאריך הרכישות<input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label>
+      <button onClick={run}>הגדר לשער של היום</button>
+      {msg && <p className="muted">{msg}</p>}
+    </div>
+  );
+}
+
+export default function ImportCsv({ onDone, reload }) {
   const [text, setText] = useState("");
   const [fileName, setFileName] = useState("");
   const [preview, setPreview] = useState(null);
@@ -39,6 +63,7 @@ export default function ImportCsv({ onDone }) {
 
   return (
     <section>
+      <FxReset onDone={reload} />
       <div className="card add">
         <label>קובץ CSV או Excel
           <input type="file" accept=".csv,.xlsx,.xls,text/csv" onChange={pick} />
