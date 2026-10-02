@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { cur, num, periodStatus, signed } from "./api.js";
+import { cur, num, periodStatus, px, signed } from "./api.js";
 
 const NAMES = { TLV: "בורסת תל אביב", US: "וול סטריט", FX: "שער דולר" };
 
@@ -72,7 +72,7 @@ function HoldingsTable({ rows, period }) {
                   </>
                 )}
               </td>
-              <td dir="ltr">{avg == null ? "—" : `${cur(r.currency)}${num(avg)}`}</td>
+              <td dir="ltr">{avg == null ? "—" : `${cur(r.currency)}${px(avg)}`}</td>
               <td>{qty}</td>
             </tr>
           ))}

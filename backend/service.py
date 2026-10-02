@@ -20,7 +20,7 @@ def refresh(now=None):
     A failed pull never deletes old data; it only flags the symbol as not updated."""
     now = now or _now()
     db.init_schema()
-    symbols = {r[0] for r in db.query("SELECT symbol FROM stocks")}
+    symbols = {r[0] for r in db.query("SELECT symbol FROM stocks WHERE symbol NOT IN (SELECT symbol FROM manual_prices)")}
     if db.query("SELECT 1 FROM stocks WHERE currency = 'USD' LIMIT 1"):
         symbols.add("ILS=X")
     fetched = {r[0]: _dt(r[1]) for r in db.query("SELECT symbol, fetched_at FROM quotes")}
@@ -106,7 +106,7 @@ def add_stock(symbol, lst, date=None, price=None, quantity=None, fx_rate=None, n
 
 def delete_stock(symbol):
     db.run([(f"DELETE FROM {t} WHERE symbol = ?", [symbol])
-            for t in ("transactions", "quotes", "quote_status", "daily_bars", "stocks")])
+            for t in ("transactions", "quotes", "quote_status", "daily_bars", "manual_prices", "stocks")])
 
 
 def delete_transaction(tx_id):
@@ -131,7 +131,17 @@ def _pct(x):
     return None if x is None else round(x * 100, 2)
 
 
+def _manual_prices():
+    try:
+        rows = db.query("SELECT symbol, price, updated_at FROM manual_prices")
+    except RuntimeError:  # table not created yet on an older database
+        db.init_schema()
+        rows = []
+    return {r[0]: (r[1], _dt(r[2])) for r in rows}
+
+
 def portfolio():
+    manual = _manual_prices()
     stocks = db.query("SELECT symbol, name, list, currency, exchange FROM stocks ORDER BY added_at")
     txs = db.query("SELECT id, symbol, type, date, quantity, price, gross, fees, tax, fx_rate "
                    "FROM transactions ORDER BY date, id")
@@ -158,7 +168,11 @@ def portfolio():
         q = quotes.get(sym)
         price = q[1] if q else None
         label = qt = None
-        if q:
+        if sym in manual:
+            price, upd = manual[sym]
+            il = upd.astimezone(markets.TZ["TLV"])
+            label = f"מחיר ידני, עודכן {il.day}.{il.month}"
+        elif q:
             qt, ft = _dt(q[3]), _dt(q[4])
             label = markets.as_of_label(qt, ft)
             m = markets.market_of(sym)
@@ -166,14 +180,17 @@ def portfolio():
                 as_of[m] = (qt, label)
         row = {
             "symbol": sym, "name": name, "currency": currency, "price": price,
-            "as_of": label, "stale": sym in failed or q is None,
-            "google_url": f"https://www.google.com/finance/quote/{sym.split('.')[0]}:{exch}" if exch else None,
-            "yahoo_url": f"https://finance.yahoo.com/quote/{sym}",
+            "as_of": label, "stale": False if sym in manual else (sym in failed or q is None),
+            "manual": sym in manual,
+            "google_url": None if sym in manual else (f"https://www.google.com/finance/quote/{sym.split('.')[0]}:{exch}" if exch else None),
+            "yahoo_url": None if sym in manual else f"https://finance.yahoo.com/quote/{sym}",
         }
         m = markets.market_of(sym)
         today = now.astimezone(markets.TZ[m]).date()
         quote_open = q[2] if q and qt and qt.astimezone(markets.TZ[m]).date() == today else None
         pb = periods.bases(bars.get(sym, []), today, quote_open)
+        if sym in manual:  # no opening prices exist for a hand-priced holding
+            pb = {p: (start, None, "no_data") for p, (start, _b, _s) in pb.items()}
         if lst == "watch":
             row["periods"] = {
                 p: {"status": st, "pct": _pct((price - base) / base) if st == "ok" and price is not None else None}
@@ -284,3 +301,42 @@ def sales(year=None):
                      for k in ("id", "date", "symbol", "name", "quantity", "gross", "fees", "tax", "cost", "before", "after")},
                   "pct": _pct(r["pct"])} for r in sorted(rows, key=lambda r: (r["date"], r["id"]), reverse=True)],
     }
+
+
+def add_manual(symbol, name, price_now, date, quantity, price, now=None):
+    """A holding with no live price source (e.g. a mutual fund): the price is entered by hand, in shekels."""
+    now = now or _now()
+    symbol = (symbol or "").strip().upper()
+    if not SYMBOL_RE.match(symbol):
+        raise ValueError("סימול לא תקין")
+    if not (name or "").strip():
+        raise ValueError("חסר שם")
+    if not (price_now and price_now > 0):
+        raise ValueError("שער נוכחי חייב להיות חיובי")
+    try:
+        if date_cls.fromisoformat(date) > now.date():
+            raise ValueError("תאריך עתידי")
+    except (TypeError, ValueError):
+        raise ValueError("תאריך לא תקין")
+    if not (quantity and quantity > 0 and price and price > 0):
+        raise ValueError("כמות ושער רכישה חייבים להיות חיוביים")
+    if db.query("SELECT 1 FROM stocks WHERE symbol = ?", [symbol]):
+        raise ValueError("הסימול כבר קיים")
+    db.init_schema()
+    db.run([
+        ("INSERT INTO stocks (symbol, name, list, currency, exchange, added_at) VALUES (?, ?, 'buy', 'ILS', NULL, ?)",
+         [symbol, name.strip(), now.isoformat()]),
+        ("INSERT INTO manual_prices (symbol, price, updated_at) VALUES (?, ?, ?)", [symbol, price_now, now.isoformat()]),
+        ("INSERT INTO transactions (symbol, type, date, quantity, price) VALUES (?, 'buy', ?, ?, ?)",
+         [symbol, date, quantity, price]),
+    ])
+    return {"symbol": symbol}
+
+
+def set_manual_price(symbol, price, now=None):
+    if not (price and price > 0):
+        raise ValueError("שער חייב להיות חיובי")
+    if not db.query("SELECT 1 FROM manual_prices WHERE symbol = ?", [symbol]):
+        raise LookupError("זו לא החזקה עם מחיר ידני")
+    db.query("UPDATE manual_prices SET price = ?, updated_at = ? WHERE symbol = ?",
+             [price, (now or _now()).isoformat(), symbol])

@@ -131,3 +131,26 @@ def add_sale(body: Sale):
 @app.get("/api/sales", dependencies=[Depends(require_session)])
 def sales(year: Optional[int] = None):
     return service.sales(year)
+
+
+class Manual(BaseModel):
+    symbol: str
+    name: str
+    price_now: float
+    date: str
+    quantity: float
+    price: float
+
+
+class ManualPrice(BaseModel):
+    price: float
+
+
+@app.post("/api/manual", dependencies=[Depends(require_session)])
+def add_manual(body: Manual):
+    return _guard(service.add_manual, body.symbol, body.name, body.price_now, body.date, body.quantity, body.price)
+
+
+@app.post("/api/manual/{symbol}/price", dependencies=[Depends(require_session)])
+def set_manual_price(symbol: str, body: ManualPrice):
+    return _guard(service.set_manual_price, symbol.upper(), body.price) or {"ok": True}
