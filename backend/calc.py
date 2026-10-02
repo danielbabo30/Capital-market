@@ -52,3 +52,19 @@ def period_position(lots, scale, price, fx_now, currency, base_price, start):
         pl += (price - base) * q * mult
         base_val += base * q * mult
     return {"pl": pl, "base": base_val, "pct": pl / base_val if base_val else None}
+
+
+def sale_cost(buys, qty, currency):
+    """Cost of qty sold at the weighted-average buy price (USD: times the weighted-average USD rate of
+    the purchases, so the cost is in shekels like the proceeds)."""
+    bought = sum(b["quantity"] for b in buys)
+    avg = sum(b["quantity"] * b["price"] for b in buys) / bought
+    if currency == "ILS":
+        return qty * avg
+    fx_avg = sum(b["quantity"] * b["price"] * b["fx_rate"] for b in buys) / (bought * avg)
+    return qty * avg * fx_avg
+
+
+def sale_result(gross, fees, tax, cost):
+    before = gross - fees - cost
+    return {"before": before, "after": before - tax, "pct": before / cost if cost else None}

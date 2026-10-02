@@ -69,6 +69,9 @@ def validate(text):
     existing = {(s, d, q, p) for s, d, q, p in db.query(
         "SELECT symbol, date, quantity, price FROM transactions WHERE type = 'buy'")}
     held = set(known)
+    left = {}  # remaining quantity per symbol, updated in file order
+    for sym, typ, q in db.query("SELECT symbol, type, quantity FROM transactions"):
+        left[sym] = left.get(sym, 0) + (q if typ == "buy" else -q)
     seen = set()
     for row in rows:
         if row["error"]:
@@ -88,8 +91,14 @@ def validate(text):
                 row["error"] = "רכישה זהה כבר קיימת"
             seen.add(key)
             held.add(sym)
-        elif row["action"] == "sell" and sym not in held:
-            row["error"] = "מכירה של מניה שלא נרכשה"
+            left[sym] = left.get(sym, 0) + row["quantity"]
+        elif row["action"] == "sell":
+            if sym not in held:
+                row["error"] = "מכירה של מניה שלא נרכשה"
+            elif row["quantity"] > left.get(sym, 0) + 1e-9:
+                row["error"] = f"אפשר למכור עד {left.get(sym, 0):g} יחידות"
+            else:
+                left[sym] -= row["quantity"]
     return rows, quotes
 
 

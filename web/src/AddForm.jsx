@@ -2,7 +2,7 @@ import { useState } from "react";
 import { api } from "./api.js";
 
 export default function AddForm({ onDone }) {
-  const [f, setF] = useState({ symbol: "", list: "buy", date: "", price: "", quantity: "", fx_rate: "" });
+  const [f, setF] = useState({ symbol: "", list: "buy", date: "", price: "", quantity: "", fx_rate: "", gross: "", fees: "", tax: "" });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
@@ -12,15 +12,17 @@ export default function AddForm({ onDone }) {
     setBusy(true);
     setError("");
     const body = { symbol: f.symbol, list: f.list };
-    if (f.list === "buy") {
+    if (f.list === "sell") {
+      Object.assign(body, { date: f.date, quantity: Number(f.quantity), gross: Number(f.gross), fees: Number(f.fees || 0), tax: Number(f.tax || 0) });
+    } else if (f.list === "buy") {
       body.date = f.date;
       body.price = Number(f.price);
       body.quantity = Number(f.quantity);
       if (f.fx_rate) body.fx_rate = Number(f.fx_rate);
     }
     try {
-      await api("/api/stocks", { method: "POST", body: JSON.stringify(body) });
-      onDone();
+      await api(f.list === "sell" ? "/api/sales" : "/api/stocks", { method: "POST", body: JSON.stringify(body) });
+      onDone(f.list);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -37,8 +39,20 @@ export default function AddForm({ onDone }) {
         <select value={f.list} onChange={set("list")}>
           <option value="buy">רכישות</option>
           <option value="watch">מעקב</option>
+          <option value="sell">מכירה</option>
         </select>
       </label>
+      {f.list === "sell" && (
+        <>
+          <label>תאריך מכירה<input type="date" value={f.date} onChange={set("date")} required /></label>
+          <label>כמות שנמכרה<input type="number" step="any" min="0" value={f.quantity} onChange={set("quantity")} required /></label>
+          <label>סך תמורה לפני עמלות (בשקלים)
+            <input type="number" step="any" min="0" value={f.gross} onChange={set("gross")} required />
+          </label>
+          <label>סך עמלות (בשקלים)<input type="number" step="any" min="0" value={f.fees} onChange={set("fees")} /></label>
+          <label>סך מס (בשקלים)<input type="number" step="any" min="0" value={f.tax} onChange={set("tax")} /></label>
+        </>
+      )}
       {f.list === "buy" && (
         <>
           <label>תאריך קנייה<input type="date" value={f.date} onChange={set("date")} required /></label>

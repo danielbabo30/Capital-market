@@ -110,12 +110,16 @@ def delete_stock(symbol):
 
 
 def delete_transaction(tx_id):
-    rows = db.query("SELECT symbol FROM transactions WHERE id = ?", [tx_id])
+    rows = db.query("SELECT symbol, type, quantity FROM transactions WHERE id = ?", [tx_id])
     if not rows:
         raise LookupError("not found")
-    sym = rows[0][0]
+    sym, typ, qty = rows[0]
+    if typ == "buy":
+        buys, sold = _held(sym)
+        if sum(b["quantity"] for b in buys) - qty < sold - 1e-9:
+            raise ValueError("יש מכירות שתלויות ברכישה הזו. מחק קודם את המכירות")
     db.query("DELETE FROM transactions WHERE id = ?", [tx_id])
-    if not db.query("SELECT 1 FROM transactions WHERE symbol = ? AND type = 'buy' LIMIT 1", [sym]):
+    if typ == "buy" and not db.query("SELECT 1 FROM transactions WHERE symbol = ? AND type = 'buy' LIMIT 1", [sym]):
         db.query("UPDATE stocks SET list = 'watch' WHERE symbol = ?", [sym])
 
 
@@ -197,10 +201,15 @@ def portfolio():
             stock_pl_ils=_money(pos.get("stock_pl")), fx_pl_ils=_money(pos.get("fx_pl")),
             transactions=tx_list.get(sym, []),
         )
-        buy_rows.append(row)
+        if pos["qty"] > 0:  # fully sold positions live on the sales screen only
+            buy_rows.append(row)
 
     s = calc.summarize(positions)
+    sold_rows = _sale_rows()
+    realized_before = sum(r["before"] for r in sold_rows)
+    realized_after = sum(r["after"] for r in sold_rows)
     return {
+        "realized": {"before_tax": _money(realized_before), "after_tax": _money(realized_after)},
         "summary": {"value_ils": _money(s["value"]), "cost_ils": _money(s["cost"]),
                     "pl_ils": _money(s["pl"]), "pl_pct": _pct(s["pct"])},
         "periods": {p: {"status": "ok" if port_base[p] else "none", "pl_ils": _money(port_pl[p]),
@@ -208,4 +217,70 @@ def portfolio():
                     for p in periods.PERIODS},
         "as_of": {m: v[1] for m, v in as_of.items()},
         "buy": buy_rows, "watch": watch_rows,
+    }
+
+
+def _held(symbol):
+    """(buy rows, sold qty) for a symbol."""
+    rows = db.query("SELECT type, quantity, price, fx_rate FROM transactions WHERE symbol = ?", [symbol])
+    buys = [{"quantity": q, "price": p, "fx_rate": fx} for t, q, p, fx in rows if t == "buy"]
+    return buys, sum(q for t, q, _p, _f in rows if t == "sell")
+
+
+def add_sale(symbol, date, quantity, gross, fees, tax, now=None):
+    now = now or _now()
+    symbol = (symbol or "").strip().upper()
+    try:
+        if date_cls.fromisoformat(date) > now.date():
+            raise ValueError("תאריך עתידי")
+    except (TypeError, ValueError):
+        raise ValueError("תאריך לא תקין")
+    if not (quantity and quantity > 0):
+        raise ValueError("כמות חייבת להיות חיובית")
+    if gross is None or gross <= 0 or fees is None or fees < 0 or tax is None or tax < 0:
+        raise ValueError("תמורה חייבת להיות חיובית, ועמלות ומס אינם יכולים להיות שליליים")
+    buys, sold = _held(symbol)
+    if not buys:
+        raise LookupError("אין רכישות של המניה הזו")
+    left = sum(b["quantity"] for b in buys) - sold
+    if quantity > left + 1e-9:
+        raise ValueError(f"אפשר למכור עד {left:g} יחידות")
+    db.query("INSERT INTO transactions (symbol, type, date, quantity, gross, fees, tax) VALUES (?, 'sell', ?, ?, ?, ?, ?)",
+             [symbol, date, quantity, gross, fees, tax])
+    return {"symbol": symbol}
+
+
+def _sale_rows():
+    stocks = {r[0]: (r[1], r[2]) for r in db.query("SELECT symbol, name, currency FROM stocks")}
+    txs = db.query("SELECT id, symbol, type, date, quantity, price, gross, fees, tax, fx_rate "
+                   "FROM transactions ORDER BY date, id")
+    buys, out = {}, []
+    for id_, sym, typ, date, qty, price, gross, fees, tax, fx in txs:
+        if typ == "buy":
+            buys.setdefault(sym, []).append({"quantity": qty, "price": price, "fx_rate": fx})
+    for id_, sym, typ, date, qty, price, gross, fees, tax, fx in txs:
+        if typ != "sell" or sym not in buys:
+            continue
+        name, currency = stocks[sym]
+        cost = calc.sale_cost(buys[sym], qty, currency)
+        res = calc.sale_result(gross, fees, tax, cost)
+        out.append({"id": id_, "date": date, "symbol": sym, "name": name, "quantity": qty, "gross": gross,
+                    "fees": fees, "tax": tax, "cost": cost, **{"before": res["before"], "after": res["after"], "pct": res["pct"]}})
+    return out
+
+
+def sales(year=None):
+    rows = _sale_rows()
+    years = sorted({r["date"][:4] for r in rows}, reverse=True)
+    if year:
+        rows = [r for r in rows if r["date"][:4] == str(year)]
+    tot = {k: sum(r[k] for r in rows) for k in ("gross", "fees", "tax", "cost", "before", "after")}
+    return {
+        "years": years,
+        "summary": {**{k: _money(v) for k, v in tot.items()},
+                    "pct_before": _pct(tot["before"] / tot["cost"]) if tot["cost"] else None,
+                    "pct_after": _pct(tot["after"] / tot["cost"]) if tot["cost"] else None},
+        "rows": [{**{k: _money(r[k]) if k in ("gross", "fees", "tax", "cost", "before", "after") else r[k]
+                     for k in ("id", "date", "symbol", "name", "quantity", "gross", "fees", "tax", "cost", "before", "after")},
+                  "pct": _pct(r["pct"])} for r in sorted(rows, key=lambda r: (r["date"], r["id"]), reverse=True)],
     }

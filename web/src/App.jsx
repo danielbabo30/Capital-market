@@ -4,6 +4,7 @@ import Dashboard from "./Dashboard.jsx";
 import StockList from "./StockList.jsx";
 import AddForm from "./AddForm.jsx";
 import ImportCsv from "./ImportCsv.jsx";
+import Sales from "./Sales.jsx";
 import { api } from "./api.js";
 
 const PERIODS = [
@@ -17,6 +18,7 @@ const TABS = [
   ["dashboard", "דשבורד"],
   ["buy", "רכישות"],
   ["watch", "מעקב"],
+  ["sales", "מכירות"],
   ["add", "הוספה"],
   ["import", "ייבוא"],
 ];
@@ -105,7 +107,9 @@ export default function App() {
       ) : tab === "dashboard" ? (
         <Dashboard data={data} period={period} />
       ) : tab === "add" ? (
-        <AddForm onDone={async () => { await refresh(); setTab("buy"); }} />
+        <AddForm onDone={async (kind) => { await refresh(); setTab(kind === "sell" ? "sales" : "buy"); }} />
+      ) : tab === "sales" ? (
+        <Sales onError={handle} />
       ) : tab === "import" ? (
         <ImportCsv onDone={async () => { await refresh(); setTab("buy"); }} />
       ) : (

@@ -112,3 +112,22 @@ def import_preview(body: CsvBody):
 @app.post("/api/import/commit", dependencies=[Depends(require_session)])
 def import_commit(body: CsvBody):
     return _guard(importer.commit, body.csv)
+
+
+class Sale(BaseModel):
+    symbol: str
+    date: str
+    quantity: float
+    gross: float
+    fees: float
+    tax: float
+
+
+@app.post("/api/sales", dependencies=[Depends(require_session)])
+def add_sale(body: Sale):
+    return _guard(service.add_sale, body.symbol, body.date, body.quantity, body.gross, body.fees, body.tax)
+
+
+@app.get("/api/sales", dependencies=[Depends(require_session)])
+def sales(year: Optional[int] = None):
+    return service.sales(year)

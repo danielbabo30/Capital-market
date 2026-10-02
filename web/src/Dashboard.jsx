@@ -26,6 +26,15 @@ export default function Dashboard({ data, period }) {
         </div>
       </div>
       <div className="card">
+        <div className="muted">רווח ממומש (מכירות)</div>
+        <div className="row">
+          <span>לפני מס</span><span className={data.realized.before_tax > 0 ? "pos" : data.realized.before_tax < 0 ? "neg" : ""}>₪{signed(data.realized.before_tax)}</span>
+        </div>
+        <div className="row">
+          <span>אחרי מס</span><span className={data.realized.after_tax > 0 ? "pos" : data.realized.after_tax < 0 ? "neg" : ""}>₪{signed(data.realized.after_tax)}</span>
+        </div>
+      </div>
+      <div className="card">
         {Object.entries(data.as_of).filter(([m]) => m !== "FX").map(([m, label]) => (
           <div key={m}>{NAMES[m]}: {label}</div>
         ))}
