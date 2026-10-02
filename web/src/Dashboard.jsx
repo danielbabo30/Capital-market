@@ -8,6 +8,7 @@ const COLS = [
   ["pct", "שינוי %"],
   ["pl", "שינוי ₪"],
   ["value", "שווי החזקה"],
+  ["total", "רווח/הפסד כולל"],
   ["avg", "שער רכישה ממוצע"],
   ["qty", "כמות"],
 ];
@@ -22,6 +23,7 @@ function HoldingsTable({ rows, period }) {
       pct: p.status === "ok" ? p.pct : null,
       pl: p.status === "ok" ? p.pl_ils : null,
       value: r.value_ils,
+      total: r.pl_ils,
       avg: r.avg_price,
       qty: r.qty,
       status: p.status,
@@ -51,7 +53,7 @@ function HoldingsTable({ rows, period }) {
           </tr>
         </thead>
         <tbody>
-          {items.map(({ r, name, pct, pl, value, avg, qty, status }) => (
+          {items.map(({ r, name, pct, pl, value, total, avg, qty, status }) => (
             <tr key={r.symbol}>
               <td>
                 <div>{name}</div>
@@ -62,6 +64,14 @@ function HoldingsTable({ rows, period }) {
               </td>
               <td className={clsOf(pl)}>{status === "ok" ? `₪${signed(pl)}` : "—"}</td>
               <td>{value == null ? "—" : `₪${num(value)}`}</td>
+              <td className={clsOf(total)}>
+                {total == null ? "—" : (
+                  <>
+                    <div>₪{signed(total)}</div>
+                    <div dir="ltr">{signed(r.pl_pct)}%</div>
+                  </>
+                )}
+              </td>
               <td dir="ltr">{avg == null ? "—" : `${cur(r.currency)}${num(avg)}`}</td>
               <td>{qty}</td>
             </tr>
