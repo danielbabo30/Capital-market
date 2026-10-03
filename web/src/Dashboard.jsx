@@ -6,6 +6,7 @@ const NAMES = { TLV: "בורסת תל אביב", US: "וול סטריט", FX: "�
 
 const COLS = [
   ["name", "שם המניה"],
+  ["price", "שער נוכחי"],
   ["pct", "שינוי %"],
   ["pl", "שינוי ₪"],
   ["value", "שווי החזקה"],
@@ -21,6 +22,7 @@ function HoldingsTable({ rows, period }) {
     return {
       r,
       name: r.name || r.symbol,
+      price: r.price,
       pct: p.status === "ok" ? p.pct : null,
       pl: p.status === "ok" ? p.pl_ils : null,
       value: r.value_ils,
@@ -54,7 +56,7 @@ function HoldingsTable({ rows, period }) {
           </tr>
         </thead>
         <tbody>
-          {items.map(({ r, name, pct, pl, value, total, avg, qty, status }) => (
+          {items.map(({ r, name, price, pct, pl, value, total, avg, qty, status }) => (
             <tr key={r.symbol}>
               <td>
                 <div className="namecell">
@@ -65,6 +67,7 @@ function HoldingsTable({ rows, period }) {
                   </div>
                 </div>
               </td>
+              <td dir="ltr">{price == null ? "—" : `${cur(r.currency)}${px(price)}`}</td>
               <td className={clsOf(pct)} dir="ltr">
                 {status === "ok" ? `${signed(pct)}%` : <span className="muted">{periodStatus[status]}</span>}
               </td>
