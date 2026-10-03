@@ -120,3 +120,16 @@ td:first-child .logo { width: 26px !important; height: 26px !important; }
 .modal .x { border: none; background: none; font-size: 1.6rem; line-height: 1; padding: 0 6px; color: var(--muted); }
 .modal .card { box-shadow: none; border: none; padding: 0; margin-bottom: 0; background: transparent; }
 .modal section .card { border: 1px solid var(--line); padding: 12px; margin-bottom: 10px; background: var(--card); }
+
+/* popup content is centered */
+.modalhead { position: relative; justify-content: center; }
+.modalhead .x { position: absolute; inset-inline-start: 10px; top: 50%; transform: translateY(-50%); }
+.modalbody { align-items: stretch; text-align: center; }
+.modal .row { justify-content: center; gap: 14px; flex-wrap: wrap; }
+.modal .add label { align-items: center; text-align: center; }
+.modal .add input, .modal .add select { text-align: center; text-align-last: center; width: 100%; box-sizing: border-box; }
+.modal .add input[dir="ltr"] { text-align: center; }
+.modal .card, .modal section .card { align-items: center; }
+.modal .links, .modal .prev { justify-content: center; }
+.modal details { text-align: center; }
+.modal .periods { justify-content: center; }
