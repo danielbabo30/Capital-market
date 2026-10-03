@@ -95,8 +95,8 @@ th:last-child { border-radius: 10px 0 0 0; }
 .logo.ph { display: inline-flex; align-items: center; justify-content: center; background: var(--accent-soft); color: var(--accent); font-weight: 700; text-transform: uppercase; }
 .namecell { display: flex; align-items: center; gap: 8px; }
 .filelink { cursor: pointer; }
-/* narrow name column: long names wrap onto a second line instead of widening the table */
-td:first-child, th:first-child { width: 128px; max-width: 128px; white-space: normal; }
+/* narrow name column: long names wrap at spaces onto a second line instead of widening the table */
+td:first-child, th:first-child { min-width: 118px; max-width: 140px; white-space: normal; }
 td:first-child .namecell { gap: 6px; align-items: center; }
-td:first-child .namecell > div { min-width: 0; line-height: 1.25; overflow-wrap: anywhere; }
+td:first-child .namecell > div { line-height: 1.25; }
 td:first-child .logo { width: 26px !important; height: 26px !important; }

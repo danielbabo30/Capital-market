@@ -9,6 +9,7 @@ import { api } from "./api.js";
 
 const PERIODS = [
   ["today", "היום"],
+  ["yesterday", "אתמול"],
   ["week", "מתחילת השבוע"],
   ["d7", "7 ימים"],
   ["month", "חודש"],

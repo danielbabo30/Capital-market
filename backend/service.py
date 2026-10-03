@@ -177,8 +177,8 @@ def portfolio():
     failed = {r[0] for r in db.query("SELECT symbol FROM quote_status WHERE failed = 1")}
     fx_now = quotes["ILS=X"][1] if "ILS=X" in quotes else None
     bars = {}
-    for sym, d, o in db.query("SELECT symbol, date, open FROM daily_bars ORDER BY date"):
-        bars.setdefault(sym, []).append((d, o))
+    for sym, d, o, c in db.query("SELECT symbol, date, open, close FROM daily_bars ORDER BY date"):
+        bars.setdefault(sym, []).append((d, o, c))
     now = _now()
     port_pl = {p: 0.0 for p in periods.PERIODS}
     port_base = {p: 0.0 for p in periods.PERIODS}
@@ -218,11 +218,13 @@ def portfolio():
         quote_open = q[2] if q and qt and qt.astimezone(markets.TZ[m]).date() == today else None
         pb = periods.bases(bars.get(sym, []), today, quote_open)
         if sym in manual:  # no opening prices exist for a hand-priced holding
-            pb = {p: (start, None, "no_data") for p, (start, _b, _s) in pb.items()}
+            pb = {p: (v[0], None, "no_data", None) for p, v in pb.items()}
         if lst == "watch":
             row["periods"] = {
-                p: {"status": st, "pct": _pct((price - base) / base) if st == "ok" and price is not None else None}
-                for p, (_s, base, st) in pb.items()
+                p: {"status": st,
+                    "pct": _pct(((end if end is not None else price) - base) / base)
+                           if st == "ok" and (end is not None or price is not None) else None}
+                for p, (_s, base, st, end) in pb.items()
             }
             watch_rows.append(row)
             continue
@@ -230,10 +232,11 @@ def portfolio():
         positions.append(pos)
         row["periods"] = {}
         bought = sum(b["quantity"] for b in buys.get(sym, []))
-        for p, (start, base, st) in pb.items():
+        for p, (start, base, st, end) in pb.items():
             res = None
             if st == "ok" and price is not None and bought > 0 and pos["qty"] > 0:
-                res = calc.period_position(tx_list[sym], pos["qty"] / bought, price, fx_now, currency, base, start)
+                res = calc.period_position(tx_list[sym], pos["qty"] / bought, price if end is None else end,
+                                           fx_now, currency, base, start, start if p == "yesterday" else None)
             if res:
                 port_pl[p] += res["pl"]
                 port_base[p] += res["base"]

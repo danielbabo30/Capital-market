@@ -35,7 +35,7 @@ def summarize(positions):
     return {"value": value, "cost": cost, "pl": pl, "pct": pl / cost if cost else None}
 
 
-def period_position(lots, scale, price, fx_now, currency, base_price, start):
+def period_position(lots, scale, price, fx_now, currency, base_price, start, end_date=None):
     """P/L of one holding over a period. Each lot is measured from the period's opening price,
     or from its own purchase price if it was bought on/after the period start.
     scale = remaining qty / bought qty (sales shrink every lot equally, like the average-cost model).
@@ -47,6 +47,8 @@ def period_position(lots, scale, price, fx_now, currency, base_price, start):
         mult = fx_now
     pl = base_val = 0.0
     for lot in lots:
+        if end_date and lot["date"] > end_date:
+            continue  # bought after the period ended: not held during it
         base = lot["price"] if lot["date"] >= start else base_price
         q = lot["quantity"] * scale
         pl += (price - base) * q * mult
