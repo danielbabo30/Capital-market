@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { api } from "./api.js";
 
-export default function AddForm({ onDone }) {
-  const [f, setF] = useState({ symbol: "", list: "buy", date: "", price: "", quantity: "", fx_rate: "", gross: "", fees: "", tax: "", name: "", price_now: "" });
+export default function AddForm({ onDone, mode = "add", owned = [] }) {
+  const [f, setF] = useState({ symbol: mode === "sell" ? (owned[0]?.symbol ?? "") : "", list: mode === "sell" ? "sell" : "buy", date: "", price: "", quantity: "", fx_rate: "", gross: "", fees: "", tax: "", name: "", price_now: "" });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
@@ -34,17 +34,26 @@ export default function AddForm({ onDone }) {
 
   return (
     <form className="card add" onSubmit={submit}>
-      <label>סימול (ת"א עם סיומת .TA, למשל TEVA.TA)
-        <input dir="ltr" value={f.symbol} onChange={set("symbol")} placeholder="AAPL" required />
-      </label>
-      <label>רשימה
-        <select value={f.list} onChange={set("list")}>
-          <option value="buy">רכישות</option>
-          <option value="watch">מעקב</option>
-          <option value="sell">מכירה</option>
-          <option value="manual">החזקה עם מחיר ידני (קרן וכד')</option>
-        </select>
-      </label>
+      {mode === "sell" ? (
+        <label>מניה
+          <select value={f.symbol} onChange={set("symbol")} required>
+            {owned.map((r) => <option key={r.symbol} value={r.symbol}>{r.name} ({r.symbol}), כמות {r.qty}</option>)}
+          </select>
+        </label>
+      ) : (
+        <>
+          <label>סימול (ת"א עם סיומת .TA, למשל TEVA.TA)
+            <input dir="ltr" value={f.symbol} onChange={set("symbol")} placeholder="AAPL" required />
+          </label>
+          <label>רשימה
+            <select value={f.list} onChange={set("list")}>
+              <option value="buy">רכישות</option>
+              <option value="watch">מעקב</option>
+              <option value="manual">החזקה עם מחיר ידני (קרן וכד')</option>
+            </select>
+          </label>
+        </>
+      )}
       {f.list === "manual" && (
         <>
           <p className="muted">לנייר שאין לו שער ב-Yahoo. אפשר להזין מספר נייר כסימול. כל הסכומים בשקלים (לא באגורות), והשער הנוכחי מתעדכן ידנית.</p>

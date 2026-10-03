@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Logo } from "./Logo.jsx";
+import { DollarIcon, ImportIcon, PlusIcon, RefreshIcon } from "./Icons.jsx";
 import { cur, num, periodStatus, px, signed, ils } from "./api.js";
 
 const NAMES = { TLV: "בורסת תל אביב", US: "וול סטריט", FX: "שער דולר" };
@@ -15,7 +16,7 @@ const COLS = [
   ["qty", "כמות"],
 ];
 
-function HoldingsTable({ rows, period }) {
+function HoldingsTable({ rows, period, onOpen }) {
   const [sort, setSort] = useState({ key: "value", dir: -1 });
   const items = rows.map((r) => {
     const p = r.periods[period];
@@ -57,7 +58,7 @@ function HoldingsTable({ rows, period }) {
         </thead>
         <tbody>
           {items.map(({ r, name, price, pct, pl, value, total, avg, qty, status }) => (
-            <tr key={r.symbol}>
+            <tr key={r.symbol} className="clickrow" onClick={() => onOpen(r.symbol)}>
               <td>
                 <div className="namecell">
                   <Logo row={r} />
@@ -92,7 +93,25 @@ function HoldingsTable({ rows, period }) {
   );
 }
 
-export default function Dashboard({ data, period }) {
+function Toolbar({ onAdd, onRefresh, onSell, onImport, loading }) {
+  const items = [
+    [onAdd, "הוספת מניה", <PlusIcon />, ""],
+    [onRefresh, "רענון נתונים", <RefreshIcon />, loading ? "spin" : ""],
+    [onSell, "מכירת מניה", <DollarIcon />, ""],
+    [onImport, "ייבוא מקובץ", <ImportIcon />, ""],
+  ];
+  return (
+    <div className="toolbar">
+      {items.map(([fn, label, icon, cls]) => (
+        <button key={label} className={`iconbtn ${cls}`} onClick={fn} title={label} aria-label={label} disabled={loading && cls === "spin"}>
+          {icon}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export default function Dashboard({ data, period, actions }) {
   const s = data.summary;
   const pp = data.periods[period];
   const pcls = pp.pl_ils > 0 ? "pos" : pp.pl_ils < 0 ? "neg" : "";
@@ -123,7 +142,8 @@ export default function Dashboard({ data, period }) {
         <div className={`big ${data.realized.after_tax > 0 ? "pos" : data.realized.after_tax < 0 ? "neg" : ""}`}>{ils(data.realized.after_tax, true)}</div>
       </div>
       </div>
-      <HoldingsTable rows={data.buy} period={period} />
+      <Toolbar {...actions} />
+      <HoldingsTable rows={data.buy} period={period} onOpen={actions.onOpen} />
       <div className="card">
         {Object.entries(data.as_of).filter(([m]) => m !== "FX").map(([m, label]) => (
           <div key={m}>{NAMES[m]}: {label}</div>

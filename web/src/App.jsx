@@ -5,6 +5,7 @@ import StockList from "./StockList.jsx";
 import AddForm from "./AddForm.jsx";
 import ImportCsv from "./ImportCsv.jsx";
 import Sales from "./Sales.jsx";
+import Modal from "./Modal.jsx";
 import { api } from "./api.js";
 
 const PERIODS = [
@@ -17,17 +18,14 @@ const PERIODS = [
 
 const TABS = [
   ["dashboard", "דשבורד"],
-  ["buy", "רכישות"],
   ["watch", "מעקב"],
-  ["sales", "מכירות"],
-  ["add", "הוספה"],
-  ["import", "ייבוא"],
 ];
 
 export default function App() {
   const [authed, setAuthed] = useState(null);
   const [tab, setTab] = useState("dashboard");
   const [period, setPeriod] = useState("today");
+  const [modal, setModal] = useState(null); // add | sell | import | sales | { stock: symbol }
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -89,11 +87,10 @@ export default function App() {
           ))}
         </nav>
         <div className="actions">
-          <button onClick={refresh} disabled={loading}>{loading ? "מרענן…" : "רענון"}</button>
           <button onClick={logout}>התנתקות</button>
         </div>
       </header>
-      {["dashboard", "buy", "watch"].includes(tab) && (
+      {["dashboard", "watch"].includes(tab) && (
         <div className="periods">
           {PERIODS.map(([k, label]) => (
             <button key={k} className={period === k ? "active" : ""} onClick={() => setPeriod(k)}>{label}</button>
@@ -104,16 +101,56 @@ export default function App() {
       {!data ? (
         <p className="muted">טוען…</p>
       ) : tab === "dashboard" ? (
-        <Dashboard data={data} period={period} />
-      ) : tab === "add" ? (
-        <AddForm onDone={async (kind) => { await refresh(); setTab(kind === "sell" ? "sales" : "buy"); }} />
-      ) : tab === "sales" ? (
-        <Sales onError={handle} />
-      ) : tab === "import" ? (
-        <ImportCsv reload={load} onDone={async () => { await refresh(); setTab("buy"); }} />
+        <Dashboard
+          data={data}
+          period={period}
+          actions={{
+            onAdd: () => setModal("add"),
+            onSell: () => setModal("sell"),
+            onImport: () => setModal("import"),
+            onRefresh: refresh,
+            onOpen: (symbol) => setModal({ stock: symbol }),
+            loading,
+          }}
+        />
       ) : (
-        <StockList kind={tab} rows={data[tab]} period={period} reload={load} onError={handle} />
+        <StockList kind="watch" rows={data.watch} period={period} reload={load} onError={handle} />
       )}
+
+      {modal === "add" && (
+        <Modal title="הוספת מניה" onClose={() => setModal(null)}>
+          <AddForm onDone={async (kind) => { setModal(null); await refresh(); if (kind === "watch") setTab("watch"); }} />
+        </Modal>
+      )}
+      {modal === "sell" && data && (
+        <Modal title="מכירת מניה" onClose={() => setModal(null)}>
+          {data.buy.length === 0 ? (
+            <p className="muted">אין מניות שאפשר למכור.</p>
+          ) : (
+            <AddForm mode="sell" owned={data.buy} onDone={async () => { await refresh(); setModal("sales"); }} />
+          )}
+          <button className="link" onClick={() => setModal("sales")}>היסטוריית מכירות</button>
+        </Modal>
+      )}
+      {modal === "sales" && (
+        <Modal title="מכירות" onClose={() => setModal(null)}>
+          <Sales onError={handle} />
+        </Modal>
+      )}
+      {modal === "import" && (
+        <Modal title="ייבוא מקובץ" onClose={() => setModal(null)}>
+          <ImportCsv reload={load} onDone={async () => { setModal(null); await refresh(); }} />
+        </Modal>
+      )}
+      {modal?.stock && data && (() => {
+        const row = data.buy.find((r) => r.symbol === modal.stock);
+        if (!row) return null;
+        return (
+          <Modal title={row.name || row.symbol} onClose={() => setModal(null)}>
+            <StockList kind="buy" rows={[row]} period={period} reload={load} onError={handle} />
+          </Modal>
+        );
+      })()}
     </div>
   );
 }
