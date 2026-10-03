@@ -16,16 +16,10 @@ const PERIODS = [
   ["month", "חודש"],
 ];
 
-const TABS = [
-  ["dashboard", "דשבורד"],
-  ["watch", "מעקב"],
-];
-
 export default function App() {
   const [authed, setAuthed] = useState(null);
-  const [tab, setTab] = useState("dashboard");
   const [period, setPeriod] = useState("today");
-  const [modal, setModal] = useState(null); // add | sell | import | sales | { stock: symbol }
+  const [modal, setModal] = useState(null); // add | sell | import | sales | watch | { stock: symbol }
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -66,12 +60,6 @@ export default function App() {
     if (authed) load(); // entry shows what is already saved; Yahoo is pulled only by the refresh button
   }, [authed, load]);
 
-  const logout = async () => {
-    await fetch("/api/logout", { method: "POST" });
-    setAuthed(false);
-    setData(null);
-  };
-
   if (authed === null) return <main className="center">טוען…</main>;
   if (!authed) return <Login onSuccess={() => setAuthed(true)} />;
 
@@ -79,28 +67,16 @@ export default function App() {
     <div className="app">
       <header>
         <div className="brand">מעקב מניות</div>
-        <nav>
-          {TABS.map(([k, label]) => (
-            <button key={k} className={tab === k ? "active" : ""} onClick={() => setTab(k)}>
-              {label}
-            </button>
-          ))}
-        </nav>
-        <div className="actions">
-          <button onClick={logout}>התנתקות</button>
-        </div>
       </header>
-      {["dashboard", "watch"].includes(tab) && (
-        <div className="periods">
-          {PERIODS.map(([k, label]) => (
-            <button key={k} className={period === k ? "active" : ""} onClick={() => setPeriod(k)}>{label}</button>
-          ))}
-        </div>
-      )}
+      <div className="periods">
+        {PERIODS.map(([k, label]) => (
+          <button key={k} className={period === k ? "active" : ""} onClick={() => setPeriod(k)}>{label}</button>
+        ))}
+      </div>
       {error && <p className="error">{error}</p>}
       {!data ? (
         <p className="muted">טוען…</p>
-      ) : tab === "dashboard" ? (
+      ) : (
         <Dashboard
           data={data}
           period={period}
@@ -108,18 +84,17 @@ export default function App() {
             onAdd: () => setModal("add"),
             onSell: () => setModal("sell"),
             onImport: () => setModal("import"),
+            onWatch: () => setModal("watch"),
             onRefresh: refresh,
             onOpen: (symbol) => setModal({ stock: symbol }),
             loading,
           }}
         />
-      ) : (
-        <StockList kind="watch" rows={data.watch} period={period} reload={load} onError={handle} />
       )}
 
       {modal === "add" && (
         <Modal title="הוספת מניה" onClose={() => setModal(null)}>
-          <AddForm onDone={async (kind) => { setModal(null); await refresh(); if (kind === "watch") setTab("watch"); }} />
+          <AddForm onDone={async (kind) => { setModal(null); await refresh(); if (kind === "watch") setModal("watch"); }} />
         </Modal>
       )}
       {modal === "sell" && data && (
@@ -130,6 +105,11 @@ export default function App() {
             <AddForm mode="sell" owned={data.buy} onDone={async () => { await refresh(); setModal("sales"); }} />
           )}
           <button className="link" onClick={() => setModal("sales")}>היסטוריית מכירות</button>
+        </Modal>
+      )}
+      {modal === "watch" && data && (
+        <Modal title="מעקב" onClose={() => setModal(null)}>
+          <StockList kind="watch" rows={data.watch} period={period} reload={load} onError={handle} />
         </Modal>
       )}
       {modal === "sales" && (

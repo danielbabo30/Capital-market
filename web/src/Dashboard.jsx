@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Logo } from "./Logo.jsx";
-import { DollarIcon, ImportIcon, PlusIcon, RefreshIcon } from "./Icons.jsx";
+import { DollarIcon, HeartIcon, ImportIcon, PlusIcon, RefreshIcon } from "./Icons.jsx";
 import { cur, num, periodStatus, px, signed, ils } from "./api.js";
 
 const NAMES = { TLV: "בורסת תל אביב", US: "וול סטריט", FX: "שער דולר" };
@@ -93,12 +93,13 @@ function HoldingsTable({ rows, period, onOpen }) {
   );
 }
 
-function Toolbar({ onAdd, onRefresh, onSell, onImport, loading }) {
+function Toolbar({ onAdd, onRefresh, onSell, onImport, onWatch, loading }) {
   const items = [
     [onAdd, "הוספת מניה", <PlusIcon />, ""],
     [onRefresh, "רענון נתונים", <RefreshIcon />, loading ? "spin" : ""],
     [onSell, "מכירת מניה", <DollarIcon />, ""],
     [onImport, "ייבוא מקובץ", <ImportIcon />, ""],
+    [onWatch, "רשימת מעקב", <HeartIcon />, ""],
   ];
   return (
     <div className="toolbar">

@@ -12,3 +12,4 @@ export const RefreshIcon = () => (
 );
 export const DollarIcon = () => <Svg><path d="M12 2v20" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></Svg>;
 export const ImportIcon = () => <Svg><rect x="3" y="3" width="18" height="18" rx="3" /><path d="M12 7v9" /><path d="m8 12 4 4 4-4" /></Svg>;
+export const HeartIcon = () => <Svg><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" /></Svg>;
