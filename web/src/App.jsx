@@ -65,9 +65,6 @@ export default function App() {
 
   return (
     <div className="app">
-      <header>
-        <div className="brand">מעקב מניות</div>
-      </header>
       <div className="periods">
         {PERIODS.map(([k, label]) => (
           <button key={k} className={period === k ? "active" : ""} onClick={() => setPeriod(k)}>{label}</button>

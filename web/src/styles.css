@@ -133,3 +133,16 @@ td:first-child .logo { width: 26px !important; height: 26px !important; }
 .modal .links, .modal .prev { justify-content: center; }
 .modal details { text-align: center; }
 .modal .periods { justify-content: center; }
+
+/* cleaner icon toolbar: one soft card, round icon buttons with a small caption */
+.app { padding-top: 18px; }
+.toolbar { display: flex; justify-content: space-around; gap: 4px; padding: 10px 6px; margin-bottom: 10px;
+  background: var(--card); border-radius: 16px; box-shadow: var(--shadow); }
+.tool { display: flex; flex-direction: column; align-items: center; gap: 5px; background: none; border: none; padding: 2px 4px;
+  color: var(--muted); font-size: 0.75rem; min-width: 52px; }
+.tool .iconbtn { width: 44px; height: 44px; border-radius: 50%; border: none; box-shadow: none; background: var(--accent-soft); color: var(--accent);
+  transition: background 0.15s, color 0.15s; }
+.tool:hover:not(:disabled) .iconbtn { background: var(--accent); color: var(--accent-text); }
+.tool.spin .iconbtn svg { animation: spin 0.9s linear infinite; }
+.tool:disabled { opacity: 1; cursor: default; }
+.toollabel { line-height: 1; }

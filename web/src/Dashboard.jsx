@@ -95,17 +95,18 @@ function HoldingsTable({ rows, period, onOpen }) {
 
 function Toolbar({ onAdd, onRefresh, onSell, onImport, onWatch, loading }) {
   const items = [
-    [onAdd, "הוספת מניה", <PlusIcon />, ""],
-    [onRefresh, "רענון נתונים", <RefreshIcon />, loading ? "spin" : ""],
-    [onSell, "מכירת מניה", <DollarIcon />, ""],
-    [onImport, "ייבוא מקובץ", <ImportIcon />, ""],
-    [onWatch, "רשימת מעקב", <HeartIcon />, ""],
+    [onAdd, "הוספה", <PlusIcon />, ""],
+    [onRefresh, "רענון", <RefreshIcon />, loading ? "spin" : ""],
+    [onSell, "מכירה", <DollarIcon />, ""],
+    [onImport, "ייבוא", <ImportIcon />, ""],
+    [onWatch, "מעקב", <HeartIcon />, ""],
   ];
   return (
     <div className="toolbar">
       {items.map(([fn, label, icon, cls]) => (
-        <button key={label} className={`iconbtn ${cls}`} onClick={fn} title={label} aria-label={label} disabled={loading && cls === "spin"}>
-          {icon}
+        <button key={label} className={`tool ${cls}`} onClick={fn} aria-label={label} disabled={cls === "spin"}>
+          <span className="iconbtn">{icon}</span>
+          <span className="toollabel">{label}</span>
         </button>
       ))}
     </div>
